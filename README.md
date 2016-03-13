@@ -1,12 +1,13 @@
 WaybackMedic bot
 ===================
+Bot info page at Wikipedia: https://en.wikipedia.org/wiki/User:Green_Cardamom/WaybackMedic
+
 by User:Green Cardamom (en.wikipedia.org)
 March 2016
 MIT License
 
-Info
+Source
 ========
-Source code for WaybackMedic bot.
 GNU Awk 4.1
 
 The core functionality is medic.awk. 
@@ -21,9 +22,11 @@ demon-* is the communication layer with AWB
 
 When running AWB, if the demon detects changes to an article since medic processed it, it will re-process the article real-time to prevent unintended reverts
 
-Installation
+Install and operate
 ==================
-The install instructions are in 0INSTALL
+Install instructions 0INSTALL
+
+Operating instructions 0RUN
 
 Credits
 ==================
