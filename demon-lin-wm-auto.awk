@@ -39,24 +39,14 @@ BEGIN {
   while ((C = getopt(ARGC, ARGV, "d:p:")) != -1) {
     if(C == "p")                                     # -p <project>      Project to run 
       pid = verifypid(Optarg)
-    if(C == "d")                                     # -d <number>       Delay seconds to use (must be > 12). If set, no random delay.
-      delay = Optarg                                 #                     If -d not set, a random delay period is used (15 + 1-50 seconds)         
-                                                     #                     If -d0 (zero), no delay   
+    if(C == "d")                                     # -d <number>       Delay seconds to use. 
+      delay = Optarg                                 #                     If -d0 (zero), no delay   
   }
   setProject(pid)     # library.awk .. load Project[] paths via project.cfg
                       # if -p not given, use default noted in project.cfg
 
-  if( delay == "" || (delay < 12 && delay > 0) || ! isanumber(delay) ) {
-    delay = 15 
-    delayrandom = 1
-  }
-  else if(delay == 0) {
+  if(delay == "" || ! isanumber(delay) ) {
     delay = 0
-    delayrandom = 0
-  }
-  else {
-    delay = 15
-    delayrandom = 0
   }
 
   main()
@@ -119,10 +109,7 @@ function main(    name,tempid,article,command) {
                 if(checkexists(tempid "article.waybackmedic.txt") ) {
                   command = Exe["cp"] " " tempid "article.waybackmedic.txt " Ramdisk "article.txt"
                   prnt("demon-lin.awk: Status successful. Copying article.waybackmedic.txt to shared directory. " name)
-                  if(delayrandom)
-                    sleep( delay + randomnumber(40) ) # 180 will do ~300 in ~ 9 hours
-                  else
-                    sleep( delay )
+                  sleep( delay )
                   sys2var(command)
                 }
                 else {
