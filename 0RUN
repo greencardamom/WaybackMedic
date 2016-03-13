@@ -31,6 +31,17 @@ ________________________________________________________________________________
    "-j 2" tells how many processes to run at one time. Recommend 2 to 3. 
    Cut and paste the above line, replace "cb20151231-20160304.0001-1000" with your project name.
 
+
+2.1 View diff's of results, re-run medic for individual articles
+
+   After medic has completed running, you can view the proposed article diffs to verify it is working before uploading to Wikipedia via AWB
+
+   1. ./bug -n "Charles Dickens" -d c
+      (or "-d p" for uncolored plain text diff)
+
+   2. ./bug -n "Charles Dickens" -v
+      (to view data file locations and the command to re-run medic for that name)
+
 3. Run AWB
 
      * Make a list in AWB of articles to process using meta/cb20151231-20160304.0021-0250/discovered
