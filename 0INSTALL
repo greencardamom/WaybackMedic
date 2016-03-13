@@ -69,3 +69,10 @@ Instructions for installing WaybackMedic and configuring AWB
 
 8. Edit demon-win.awk and change the paths in the 3 lines marked Configuration at the top
 
+9. The purpose of the two demon-* scripts is explained here ("Method 2")
+
+     https://en.wikipedia.org/wiki/User:Green_Cardamom/awb/cygwin
+
+   They were created to allow running medic in a VirtualBox Linux machine and AWB native under Windows. However they 
+   can also work with AWB running under Wine on Linux, or AWB on Windows and medic running in Cygwin. 
+

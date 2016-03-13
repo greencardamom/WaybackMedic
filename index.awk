@@ -38,7 +38,7 @@
 
 BEGIN {
 
-  debugfile = "/home/adminuser/wayback-medic/debug.index"
+  debugfile = Home "debug.index"
 
   if( stamp == "" ) 
     sep = ""
