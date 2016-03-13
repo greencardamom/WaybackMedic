@@ -33,7 +33,7 @@
 
 BEGIN {
 
-  while ((C = getopt(ARGC, ARGV, "abicxhp:d:m:r:s:")) != -1) { 
+  while ((C = getopt(ARGC, ARGV, "abicxhp:d:m:s:")) != -1) { 
       opts++
       if(C == "p")                 #  -p <project>   Use project name. No default.
         pid = verifypid(Optarg)
@@ -41,10 +41,6 @@ BEGIN {
         did = verifyval(Optarg)
       if(C == "m")                 #  -m <data dir>  Meta directory. Defaults to default.meta in project.cfg
         mid = verifyval(Optarg)
-      if(C == "r") {               #  -r <date>      Retrieve list of articles edited by Cyberbot during day 20160214
-        type = "retrieve"
-        year = verifyval(Optarg)
-      }
       if(C == "c")                 #  -c             Create project files. -p required
         type = "create"
       if(C == "i")                 #  -i             Create index from data directory. -p required
@@ -101,11 +97,6 @@ BEGIN {
     exit
   }
 
-  if(type ~ /retrieve/) {
-    getcatbirths(year,mid)
-    exit
-  }
-
   if(type ~ /delete/) {
     deleteproject(pid,mid,did)
     exit
@@ -136,22 +127,10 @@ BEGIN {
     sys2var(Exe["mkdir"] " " mid pid)
     checkexists(mid pid, "project.awk", "exit")
   }
-#  if(checkexists(mid pid "/db")) 
-#    print "tc.in directory already exists: " mid pid "/db"
-#  else {
-#    print "OK Creating " mid pid "/db"
-#    sys2var(Exe["mkdir"] " " mid pid "/db")
-#    checkexists(mid pid "/db", "project.awk", "exit")
-#  }
 
  # Write new project.cfg
 
   # Remove leading and trailing blank lines
-  # https://stackoverflow.com/questions/7359527/removing-trailing-starting-newlines-with-sed-awk-tr-and-friends
-  # $AWK '{ LINES=LINES $0 "\n"; } /./ { printf "%s", LINES; LINES=""; }' "$SHAREDIR"article.txt | $SED '/./,$\!d' > "$SHAREDIR""o"
-  # command = Exe["awk"] " '{ LINES=LINES $0 \"\\n\"; } /./ { printf \"%s\", LINES; LINES=\"\"; }' " Home "project.cfg | " Exe["sed"] " '/./,$!d' > " Home "project.cfg.orig"
-  # sys2var(command)
-  # system("")
   print stripfile(Home "project.cfg") > Home "project.cfg.orig"
   close(Home "project.cfg.orig")
   print "OK Saving project.cfg to project.cfg.orig"
@@ -267,39 +246,6 @@ function makeindex(pid,did,mid,    data,meta,a) {
 
 }
 
-#
-# Download full list of names in [[Category:#### births]] to births####.auth in the Meta directory
-#
-function getcatbirths(year,mid,   a) {
-
-  if(year ~ /^[0-9]{4}$/) {
-
-    # wget -q -O- "https://tools.wmflabs.org/ext-lnk-discover/sc/sc.php?category=1840_births" | \
-    # grep '<br>' | awk '{c=split($0,a,/<br>/); while(i++ < c){if(a[i] != "") print a[i]} }' | \
-    # sort > births1840.auth
-
-    command = Exe["wget"] " -q -O- \"https://tools.wmflabs.org/ext-lnk-discover/sc/sc.php?category=" year "_births\" | " Exe["grep"] " '<br>' | " Exe["awk"] " '{c=split($0,a,/<br>/); while(i++ < c){if(a[i] != \"\") print a[i]} }' | " Exe["sort"] " > " mid "births" year ".auth"
-    sys2var(command)
-    print "OK Created " mid "births" year ".auth"
-    command = Exe["wc"] " -l " mid "births" year ".auth"
-    split(sys2var(command), a, " ")
-    if(int(a[1]) > 999) a[1] = a[1]
-    else if(int(a[1]) < 1000 && int(a[1]) > 99) a[1] = "0" a[1]
-    else if(int(a[1]) < 100 && int(a[1]) > 9) a[1] = "00" a[1]
-    else if(int(a[1]) < 10 && int(a[1]) > 0) a[1] = "000" a[1]
-    else a[1] = "error"
-
-    print "sed 's/PNAME/births" year ".0001-" a[1] "/g' 0INSTRUCTIONS > 0INSTRUCTIONS." year
-
-    # print "Suggested Project: births" year ".0001-" a[1]
-  }
-  else {
-    print "Unable to determine year: " year
-    exit
-  }
-
-}
-
 function deleteproject(pid,mid,did,    i,c,re,a) {
 
  # Delete Data and Meta directories
@@ -386,7 +332,9 @@ function check_fixspurone(pid, did, mid,    command,files,stampdir,c,i,re) {
   }
 }
 
-
+#
+# Search for string "re" in <filename> across entire project 
+#
 function check_string(filename, pid, did, mid,    re,c,files,stampdir,i,command,count) {
 
  # Be careful with escaping as unsure how grep responds 
@@ -422,7 +370,6 @@ function whatisindexname(name, filepath,      s, a, re) {
     print("Error unable to find " filepath ". " name )
     return 0
   }
-#  re = "^" regesc(strip(name)) "$"
   re = name
   while ((getline s < filepath ) > 0) {
     split(s, a, "|")
@@ -443,7 +390,6 @@ function usage() {
   print "Project - manage projects."
   print ""
   print "Usage:"
-  print "       -r <date>      Download list of articles edited by Cyberbot during 20160214"
   print "       -i             Create index from ~/data files. -p required"
   print "       -c             Create project files. -p required"
   print "       -x             Delete project files. -p required"
@@ -454,10 +400,6 @@ function usage() {
   print "       -s <filename>  Find a string (defined in source) in <filename> in the data directory"
   print "       -a             Find all fixemptyarchive"
   print "       -h             Help"
-  print ""
-  print "Examples: project -x -p cb14feb16"
-  print "          project -c -d /mnt/data/ -m /mnt/meta/ -p cb14feb16"
-  print "          project -r 20160214"
   print ""
   print "Path names for -d and -m end with trailing slash."
   print ""
