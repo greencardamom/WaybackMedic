@@ -63,11 +63,13 @@ function setProject(pid) {
 
         Project["auth"]   = Project["meta"] "auth"
         Project["index"]  = Project["meta"] "index"
+        Project["wayall"] = Project["meta"] "wayall"               # List of all IA links
+        Project["wayrm"]  = Project["meta"] "wayrm"                # IA links deleted from articles
         Project["manual"] = Project["meta"] "manual"               # Manual processing needed
         Project["timeout"] = Project["meta"] "timeout"             # Remote server timed out
-        Project["bogusapi"] = Project["meta"] "bogusapi"           # IA API returned a bogus recommendation
+        Project["bogusapi"] = Project["meta"] "bogusapi"           # IA API returned a bogus recommendation. Page actually works.
         Project["docfixes"] = Project["meta"] "Documentation"      # Documentation / fix revisions for this project
-        Project["cbignore"] = Project["meta"] "cbignore"           # Articled were added {{cbignore|id=medic}}
+        Project["cbignore"] = Project["meta"] "cbignore"           # {{cbignore|bot=medic}} was added to these articles
         Project["discovered"] = Project["meta"] "discovered"       # Articles that have changes made (for import to AWB)
 
         Project["log404"] = Project["meta"] "log404"
@@ -77,6 +79,7 @@ function setProject(pid) {
         Project["logemptyarch"] = Project["meta"] "logemptyarch"
         Project["logtrail"] = Project["meta"] "logtrail"
         Project["logemptyway"] = Project["meta"] "logemptyway"
+        Project["logencode"] = Project["meta"] "logencode"
 
 }
 
@@ -335,8 +338,27 @@ function exists(name    ,fd) {
 }
 
 #
+# Log (append) a line in a database
+#
+#  If you need more than 2 columns (ie. name|msg) then format msg with | separate entries. 
+#    If flag="noclose" don't close the file (flush buffer) after write. Useful when making many
+#      concurrent writes, particularly running under GNU parallel
+#
+function sendlog(database, name, msg, flag) {
+
+  if(length(msg))
+    print name "|" msg >> database
+  else
+    print name >> database
+
+  if(flag !~ /noclose/)
+    close(database)
+}
+
+#
 # Write to a database
 #   eg. sendto(Project["manual"], name, "choosetxt")            
+# The first argument will be uniqe in the file ie. any previous entry with the first argument is deleted and replaced with this one.
 #
 function sendto(database, name, msg,     command) {
   command = Exe["awk"] " -v indexf=\"" database "\" -v name=\"" name  "\" -v stamp=\"" msg "\" -f " Home "index.awk"
@@ -407,8 +429,7 @@ function stripfile(filen, type,    i,c,a,o,start,end,out) {
 #
 # Sleep
 #
-function sleep(seconds)
-{
+function sleep(seconds) {
   if(seconds > 0)
     sys2var( Exe["sleep"] " " seconds)
 }
@@ -430,63 +451,100 @@ function randomnumber(max) {
 #  eg. "1234" == 1. "0fr123" == 0
 #
 function isanumber(str,    safe,i) {
-  safe = str
 
+  safe = str
   while( i++ < length(safe) ) {
     if( substr(safe,i,1) !~ /[0-9]/ )          
       return 0
   }
   return 1   
+
 }          
 
+#
+# Return 1 if URL is for archive.org .. datatype() will check if for Wayback
+#                  
+function isarchiveorg(url,  safe) {
+  safe = url
+  sub(/^https?[:]\/\//,"",safe)
+  sub(/^web[.]|^www[.]|^wayback[.]/,"",safe)
+  if(safe ~ /^archive[.]org/)
+    return 1       
+  return 0
+}
 
 #
 # Replace old text with new text in source string. Non-regex match and replace. 
 #  Only works if "old" is uniq in the text.
+#  caller = debug tag calling function
 #
-function replacetext(source, old, new,    safe, a) {
+function replacetext(source, old, new, caller,    safe, a) {
 
-  # Prevent errors in case "old" has more than 1 match in "source"
+  # Prevent errors in case "old" has more than 1 (or 0) match in "source"
   a = countsubstring(source, old)
   if(a > 1 || a < 1 ) {
-    if(Debug["s"]) print "Abort. More than copy of string in source"
+    if(Debug["s"]) print "Abort. More than " a " copy(s) of string (" old ") in source: " new
     return source
   }
 
+  if(length(source) == 0 || length(old) == 0) return source
+
+  if(Debug["s"]) print "\n\n____ENTERING REPLACE from " caller
+  if(Debug["s"]) print "old: " old
+  
   safe = source
   inx = index(safe, old) 
-  safe = removesection(safe, inx, length(old) + inx )
-  safe = insertsection(safe, inx, new)
+  safe = removesection(safe, inx, length(old) + inx, caller)
+  safe = insertsection(safe, inx, new, caller)
   return safe
 }
 
 #
 # Delete sub-string from "start" count to "end" count in "str"
 #
-function removesection(str, start, end,   i,out) {
+function removesection(str, start, end, caller,   i,out) {
+
+  if(Debug["s"]) print "\n\n  --ENTERING REMOVE from " caller
+#  if(Debug["s"]) print "start: " str
 
   while(i++ < length(str)) {
     if(i < start || i >= end)
       out = out substr(str,i,1)   
   }
+  if(Debug["s"]) print "end: " out
   return out
 }
 
 #
-# Insert string "new" at location "start" in string "source"
+# Insert string "new" at location "start" in string "source" 
 #
-function insertsection(source, start, new,   i,out,space) {
+function insertsection(source, start, new, caller,  i,out,space) {
 
-  if(length(source) == 0)    # If source is empty, return new string as the full replacement         
+  if(Debug["s"]) print "\n\n  --ENTERING INSERTION from " caller
+
+  if(length(source) == 0) {                                  # If source is empty, return new string as the full replacement         
+    if(Debug["s"]) print "Source == 0 (" new ")"
     return new
+  }
 
-  if(start > length(source)) # Append to end of source if start is > length of source.
-    start = length(source)
+  if(start > length(source)) {                              # Append to end of source if start is > length of source.
+    if(substr(source,length(source),1) ~ /[ ]/) {
+      if(Debug["s"]) print "Start is > source (1)"
+      return source new
+    }
+    else {
+      if(Debug["s"]) print "Start is > source (2)"
+      return source " " new
+    }
+  }
 
   if(Debug["s"]) {
-    if(source ~ /^[{][{][ ]{0,2}wayback/) {
-      print "new: |" new "|"
-      print "start (" substr(source,start + 1,1) ") source (" start "): " source
+#    if(source ~ /nileslibrary.org/) {                                   # inside 
+    if(1) {                                                              # outside
+      Debug["s1"] = 1
+      print "\nnew: |" new "|"
+      print "\nstart (" substr(source,start + 1,1) ") source (" start "): " source   # inside
+#      print "start (" substr(source,start + 1,1) ") source (" start "): "         # outside
     }
   }
 
@@ -494,34 +552,36 @@ function insertsection(source, start, new,   i,out,space) {
 
     if(i == start) {
 
-      if(Debug["s"]) print "start - 1 (" substr(source,i - 1,1) ")"
-      if(Debug["s"]) print "start   1 (" substr(source,i ,1) ")"
-      if(Debug["s"]) print "start + 1 (" substr(source,i + 1,1) ")"
+      if(Debug["s1"]) print "start - 1 (" substr(source,i - 1,1) ")"
+      if(Debug["s1"]) print "start   1 (" substr(source,i ,1) ")"
+      if(Debug["s1"]) print "start + 1 (" substr(source,i + 1,1) ")"
 
                                                             # Preserve space if start is a space, no other spaces and followed by "|" or "}"
       if(substr(source,i,1) ~ /[ ]/ && substr(source,i+1,1) ~ /[|]|[}]/ && substr(source,i-1,1) !~ /[ ]/) {
         out = out new substr(source,i,1)        
-        if(Debug["s"]) print "*5*"
+        if(Debug["s1"]) print "*5*"
       }
                                                             # Trim space except if the space is followed by .. (for external links)
-      else if(substr(source,i,1) ~ /[ ]/ && substr(source,i+1,1) !~ /[0-9A-Za-z\]\<]/) { 
+      else if(substr(source,i,1) ~ /[ ]/ && substr(source,i+1,1) !~ /[0-9A-Za-z\]\<\"'(\[]/) { 
+#      else if(substr(source,i,1) ~ /[ ]/ && substr(source,i+1,1) !~ /[[:graph:]]/) { 
         out = out new 
-        if(Debug["s"]) print "*1*"
+        if(Debug["s1"]) print "*1*"
       }
                                                             # Trim space if "start" is space and is preceeded by space, except if followed by ..
-      else if(substr(source,i,1) ~ /[ ]/ && substr(source,i-1,1) ~ /[ ]/ && substr(source,i+1,1) !~ /[0-9A-Za-z\]\<]/) {   
+      else if(substr(source,i,1) ~ /[ ]/ && substr(source,i-1,1) ~ /[ ]/ && substr(source,i+1,1) !~ /[0-9A-Za-z\]\<\"'(\[]/) {   
+#      else if(substr(source,i,1) ~ /[ ]/ && substr(source,i-1,1) ~ /[ ]/ && substr(source,i+1,1) !~ /[[:graph:]]/) {   
         out = out new
-        if(Debug["s"]) print "*4*"
+        if(Debug["s1"]) print "*4*"
       }
       else {
                                                             # Add space if "start" is | or }, and preceeding is not a space  
         if(substr(source,i,1) ~ /[|}]/ && substr(source,i-1,1) !~ /[ ]/) {          
           out = out new " " substr(source,i,1)
-          if(Debug["s"]) print "*2*"
+          if(Debug["s1"]) print "*2*"
         }
         else {
           out = out new substr(source,i,1)                  # Default: Preserve space if start is a space
-          if(Debug["s"]) print "*3*"
+          if(Debug["s1"]) print "*3*"
         }
       }
     }
@@ -530,10 +590,10 @@ function insertsection(source, start, new,   i,out,space) {
     }
   }
 
-  if(Debug["s"]) {
-    if(source ~ /^[{][{][ ]{0,2}wayback/) {
-      print "end source: " out
-    }
+  if(Debug["s1"]) {
+    print "\nend source: " out      # inside
+#    print "end source: "         # outside
+    Debug["s1"] = 0
   }
 
   return out
@@ -542,7 +602,7 @@ function insertsection(source, start, new,   i,out,space) {
 #
 # countsubstring
 #   Returns number of occurances of pattern in str.
-#   Pattern treated as a literal string.
+#   Pattern treated as a literal string, regex char safe
 #
 #   Example: print countsubstring("[do&d?run*d!run>run*", "run*")
 #            2
@@ -559,126 +619,166 @@ function countsubstring(str, pat,    len, i, c) {
   return c
 }
 
+#
+#  usage: qsplit(string, array [, sep [, qualifier] ])
+#
+## a version of split() designed for CSV-like data. splits "string" on "sep"
+## (,) if not provided, into array[1], array[2], ... array[n]. returns "n", or
+## "-1 * n" if the line is incomplete (it has an uneven number of quotes). both
+## "sep" and "qualifier" will use the first character in the provided string.
+## uses "qualifier" (" if not provided) and ignores "sep" within quoted fields.
+## doubled qualifiers are considered escaped, and a single qualifier character
+## is used in its place. for example, foo,"bar,baz""blah",quux will be split as
+## such: array[1] = "foo"; array[2] = "bar,baz\"blah"; array[3] = "quux";
+#
+# Credit: https://github.com/e36freak/awk-libs
+#
+function qsplit(str, arr, sep, q,    a, len, cur, isin, c) {
+  delete arr;
+
+  gsub(/\\"/,"\"\"",str) # Modification for Wayback API which returns " as \"
+
+  # set "sep" if the argument was provided, using the first char
+  if (length(sep)) {
+    sep = substr(sep, 1, 1);
+  # otherwise, use ","
+  } else {
+    sep = ",";
+  }
+
+  # set "q" if the argument was provided, using the first char
+  if (length(q)) {
+    q = substr(q, 1, 1);
+  # otherwise, use '"'
+  } else {
+    q = "\"";
+  }
+
+  # split the string into the temporary array "a", one element per char
+  len = split(str, a, "");
+
+  # "cur" contains the current element of 'arr' the function is assigning to
+  cur = 1;
+  # boolean, whether or not the iterator is in a quoted string
+  isin = 0;
+  # iterate over each character
+  for (c=1; c<=len; c++) {
+    # if the current char is a quote...
+    if (a[c] == q) {
+      # if the next char is a quote, and the previous character is not a
+      # delimiter, it's an escaped literal quote (allows empty fields 
+      # that are quoted, such as "foo","","bar")
+      if (a[c+1] == q && a[c-1] != sep) {
+        arr[cur] = arr[cur] a[c];
+        c++;
+
+      # otherwise, it's a qualifier. switch boolean
+      } else {
+        isin = ! isin;
+      }
+
+    # if the current char is the separator, and we're not within quotes
+    } else if (a[c] == sep && !isin) {
+      # increment array element
+      cur++;
+
+    # otherwise, just append to the current element
+    } else {
+      arr[cur] = arr[cur] a[c];
+    }
+  }
+  # return length
+  return cur * (isin ? -1 : 1);
+}
 
 # usage: mktemp(template [, type])
 #
-## creates a temporary file or directory, safely, and returns its name.
+## creates a temporary file or directory and returns its name.
 ## if template is not a pathname, the file will be created in ENVIRON["TMPDIR"]
 ## if set, otherwise /tmp. the last six characters of template must be "XXXXXX",
 ## and these are replaced with a string that makes the filename unique. type, if
 ## supplied, is either "f", "d", or "u": for file, directory, or dry run (just
 ## returns the name, doesn't create a file), respectively. If template is not
-## provided, uses "tmp.XXXXXX". Files are created u+rw, and directories u+rwx,
-## minus umask restrictions. returns -1 if an error occurs.
+## provided, uses "tmp.XXXXXX". Recommend don't use spaces or " or ' in pathname.
 #
-# Credit: https://github.com/e36freak/awk-libs
+#  Credit: https://github.com/e36freak/awk-libs
+#  Modified by GreenC
 #
-
-function mktemp(template, type,
+function mktemp(template, type,                 
                 c, chars, len, dir, dir_esc, rstring, i, out, out_esc, umask,
-                cmd) {
+                cmd) {           
 
   # portable filename characters
-  c = "012345689ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  len = split(c, chars, "");
+  c = "012345689ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+  len = split(c, chars, "")
 
   # make sure template is valid
   if (length(template)) {
     if (template !~ /XXXXXX$/) {
-      return -1;
-    }
+      return -1
+    } 
 
   # template was not supplied, use the default
   } else {
-    template = "tmp.XXXXXX";
-  }
-
+    template = "tmp.XXXXXX"
+  }         
   # make sure type is valid
   if (length(type)) {
     if (type !~ /^[fdu]$/) {
-      return -1;
+      return -1
     }
-
   # type was not supplied, use the default
   } else {
-    type = "f";
+    type = "f"
   }
 
   # if template is a path...
   if (template ~ /\//) {
-    dir = template;
-    sub(/\/[^/]*$/, "", dir);
-    sub(/.*\//, "", template);
-
+    dir = template
+    sub(/\/[^/]*$/, "", dir)
+    sub(/.*\//, "", template)
   # template is not a path, determine base dir
   } else {
     if (length(ENVIRON["TMPDIR"])) {
-      dir = ENVIRON["TMPDIR"];
+      dir = ENVIRON["TMPDIR"]
     } else {
-      dir = "/tmp";
+      dir = "/tmp"
     }
   }
 
-  # escape dir for shell commands
-  esc_dir = dir;
-  sub(/'/, "'\\''", esc_dir);
-  esc_dir = "'" esc_dir "'";
-
   # if this is not a dry run, make sure the dir exists
-  if (type != "u" && system("test -d " esc_dir)) {
-    return -1;
+  if (type != "u" && ! exists(dir)) {
+    return -1
   }
 
   # get the base of the template, sans Xs
-  template = substr(template, 0, length(template) - 6);
-  
+  template = substr(template, 0, length(template) - 6)
+
   # generate the filename
   do {
-    rstring = "";
+    rstring = ""
     for (i=0; i<6; i++) {
-      c = chars[int(rand() * len) + 1];
-      rstring = rstring c;
+      c = chars[int(rand() * len) + 1]
+      rstring = rstring c
     }
-    
-    out_esc = out = dir "/" template rstring;
-    sub(/'/, "'\\''", out_esc);
-    out_esc = "'" out_esc "'";
-  } while (!system("test -e " out_esc));
+    out = dir "/" template rstring
+  } while( exists(out) )
 
-  # if needed, create the filename
   if (type == "f") {
-    system("touch " out_esc);
-    cmd = "umask";
-    cmd | getline umask;
-    close(cmd);
-    umask = substr(umask, 2, 1);
-    system("chmod 0" 6 - umask "00 " out_esc);
+    printf "" > out
+    close(out)
   } else if (type == "d") {
-    system("mkdir " out_esc);
-    cmd = "umask";
-    cmd | getline umask;
-    close(cmd);
-    umask = substr(umask, 2, 1);
-    system("chmod 0" 7 - umask "00 " out_esc);
+    mkdir(out)
   }
-
-  # return the filename
-  return out;
+  return out
 }
 
 #
 # Make a directory ("mkdir -p dir")
 #
-function mkdir(dir      ,command, ret, var, cwd)
-{
-
-  command = Exe["mkdir"] " -p \"" dir "\" 2>/dev/null"
-  while ((command | getline var) > 0) {
-  }
-  close(command)
-
+function mkdir(dir,    ret, var, cwd) {
+  sys2var(Exe["mkdir"] " -p \"" dir "\" 2>/dev/null")
   cwd = ENVIRON["PWD"]
-
   ret = chdir(dir)
   if (ret < 0) {
     printf("Could not create %s (%s)\n", dir, ERRNO) > "/dev/stderr"
@@ -690,6 +790,78 @@ function mkdir(dir      ,command, ret, var, cwd)
     return 0
   }
   return 1
+}
+
+#
+# URL-encode limited set of characters needed for Wikipedia templates
+#    https://en.wikipedia.org/wiki/Template:Cite_web#URL
+#
+function urlencodelimited(url,  safe) {
+
+  safe = url
+  gsub(/[ ]/, "%20", safe)
+  gsub(/["]/, "%22", safe)
+  gsub(/[']/, "%27", safe)
+  gsub(/[<]/, "%3C", safe)
+  gsub(/[>]/, "%3E", safe)
+  gsub(/[[]/, "%5B", safe)
+  gsub(/[]]/, "%5D", safe)
+  gsub(/[{]/, "%7B", safe)
+  gsub(/[}]/, "%7D", safe)
+  gsub(/[|]/, "%7C", safe)
+  return safe
 
 }
+
+#
+# URL-decode awk method. 
+#  Adaption credit: http://www.shelldorado.com/scripts/cmds/urldecode
+#
+function urldecode(url,  hextab,decoded,len,i,c,c1,c2,code,encodedLF,str) {
+
+        str = url
+        encodedLF = 0 # set to 1 to decode linefeed character
+
+	hextab ["0"] = 0;	hextab ["8"] = 8;
+	hextab ["1"] = 1;	hextab ["9"] = 9;
+	hextab ["2"] = 2;	hextab ["A"] = hextab ["a"] = 10
+	hextab ["3"] = 3;	hextab ["B"] = hextab ["b"] = 11;
+	hextab ["4"] = 4;	hextab ["C"] = hextab ["c"] = 12;
+	hextab ["5"] = 5;	hextab ["D"] = hextab ["d"] = 13;
+	hextab ["6"] = 6;	hextab ["E"] = hextab ["e"] = 14;
+	hextab ["7"] = 7;	hextab ["F"] = hextab ["f"] = 15;
+ 
+    	decoded = ""
+	i   = 1
+	len = length (str)
+	while ( i <= len ) {
+	    c = substr (str, i, 1)
+	    if ( c == "%" ) {
+	    	if ( i+2 <= len ) {
+		    c1 = substr (str, i+1, 1)
+		    c2 = substr (str, i+2, 1)
+		    if ( hextab [c1] == "" || hextab [c2] == "" ) {
+			print "WARNING (urldecode): invalid hex encoding: %" c1 c2 > "/dev/stderr"
+		    } else {
+		    	code = 0 + hextab [c1] * 16 + hextab [c2] + 0
+		    	#print "\ncode=", code
+		    	c = sprintf ("%c", code)
+			i = i + 2
+		    }
+		} else {
+		    print "WARNING (urldecode): invalid % encoding: " substr (str, i, len - i) > "/dev/stderr"
+		}
+	    } else if ( c == "+" ) {	# special handling: "+" means " "
+	    	c = " "
+	    }
+	    decoded = decoded c
+	    ++i
+	}
+	if ( encodedLF ) {
+	    return decoded	# no line newline on output
+	} else {
+	    return decoded
+	}
+}
+
 

@@ -11,8 +11,9 @@ Instructions for installing WaybackMedic and configuring AWB
 
     GNU Awk 4.1+
     GNU Parallel 
-    Wget
-    wdiff  (apt-get install wdiff) (optional)
+    jq 1.5+       (https://stedolan.github.io/jq/)
+    wget
+    wdiff         (apt-get install wdiff) (optional)
     
 2. Create two sub-directories "data" and "meta" (eg. mkdir data; mkdir meta)
 
@@ -24,9 +25,10 @@ Instructions for installing WaybackMedic and configuring AWB
     driver.awk
     medic.awk
 
-    Set the above files to executable (eg. chmod 750 ucontribs.awk)
+    Set the above files to executable (eg. chmod 750 ucontribs.awk) 
+    Set coldiff script executable
 
-4. Create symlinks to make life easier:
+4. Symlinks to make life easier:
 
     ln -s ucontribs.awk ucon
     ln -s project.awk project
@@ -34,7 +36,7 @@ Instructions for installing WaybackMedic and configuring AWB
     ln -s driver.awk driver
     ln -s medic.awk medic
 
-5. Edit init.awk and set the paths of programs 
+5. Edit init.awk and set paths to programs 
 
 
 == Configure AWB ==

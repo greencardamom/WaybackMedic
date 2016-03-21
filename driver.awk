@@ -57,6 +57,10 @@ BEGIN {
 # Save wikisource
   print http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", namewiki) "?action=raw") > wm_temp "article.txt"
   close(wm_temp "article.txt")
+  stripfile(wm_temp "article.txt", "inplace")
+
+  command = "cp " wm_temp "article.txt " wm_temp "article.txt.2"
+  sys2var(command)
 
 # Save namewiki
   print namewiki > wm_temp "namewiki.txt"
@@ -72,7 +76,7 @@ BEGIN {
   changes = sys2var(command)
   if(changes) {
     print "    Found " changes " change(s) for " namewiki > "/dev/stderr"
-    sendto(Project["discovered"], namewiki, "")
+    sendlog(Project["discovered"], namewiki, "")
   }
   else {
     if(checkexists(wm_temp "article.waybackmedic.txt")) {

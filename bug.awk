@@ -46,6 +46,9 @@ BEGIN {
       if(C == "v")                 #  -v             View paths. Default. Name required.
         type = "view"
 
+      if(C == "r")                 #  -r             Run medic. Name required.
+        type = "run"
+
       if(C == "d") {               #  -d <type>      Diff. Type is "c" for color (default) or "p" for plain text
         difftype = verifyval(Optarg)
         type = "diff"
@@ -80,6 +83,11 @@ BEGIN {
     exit
   }
 
+  if(type ~ /run/) {
+    run(name)
+    exit
+  }
+
   if(type ~ /diff/) {
     diff(name, difftype)
     exit
@@ -88,15 +96,30 @@ BEGIN {
 }
 
 function diff(name, type,   command) {
-  getindex(name)
 
- print type
+  getindex(name)
 
   if(type ~ /c/)
     command = Exe["coldiff"] " \"" Inx["path"] "\"article.txt \"" Inx["path"] "\"article.waybackmedic.txt"
   else
     command = Exe["diff"] " \"" Inx["path"] "\"article.txt \"" Inx["path"] "\"article.waybackmedic.txt"
-  
+
+  system(command)
+
+}
+
+
+function run(name,   command) {
+
+  # escape for shell commands
+#  esc_dir = name
+#  gsub(/'/, "'\\''", esc_dir)
+#  esc_dir = "'" esc_dir "'"
+#print esc_dir
+#exit
+
+  getindex(name)
+  command = Exe["medic"] " -p \"" Project["id"] "\" -n \"" name "\" -s \"" Inx["path"] "article.txt\""
   system(command)
 
 }
@@ -157,6 +180,7 @@ function usage() {
   print "       -n <name>      Name to process. Required"
   print "       -p <project>   Project name. Optional (default in project.cfg)"
   print ""           
+  print "       -r             Run WaybackMedic for this name." 
   print "       -v             View name paths. Default."
   print "       -d <type>      Diff. Type = c (default: color) or p (plain text)" 
   print ""

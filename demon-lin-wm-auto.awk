@@ -37,17 +37,20 @@
 BEGIN {
 
   while ((C = getopt(ARGC, ARGV, "d:p:")) != -1) {
-    if(C == "p")                                     # -p <project>      Project to run 
+    if(C == "p")                                     # -p <project>        Project to run 
       pid = verifypid(Optarg)
-    if(C == "d")                                     # -d <number>       Delay seconds to use. 
-      delay = Optarg                                 #                     If -d0 (zero), no delay   
+    if(C == "d")                                     # -d <number>         Delay seconds to use (must be > 12, or 0)
+      delay = Optarg                                 #                     If -d0 (zero), no delay                    
   }
   setProject(pid)     # library.awk .. load Project[] paths via project.cfg
                       # if -p not given, use default noted in project.cfg
 
-  if(delay == "" || ! isanumber(delay) ) {
+  if( delay == "" || (delay < 12 && delay > 0) || ! isanumber(delay) ) {
+    delay = 15 
+  else if(delay == 0) 
     delay = 0
-  }
+  else 
+    delay = 15
 
   main()
 
@@ -87,18 +90,21 @@ function main(    name,tempid,article,command) {
           else {
             if(checkexists(tempid "article.waybackmedic.txt"))  {  # Skip if no changes were made.
 
-              print http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", name) "?action=raw") > tempid "article.new.txt"
-              close(tempid "article.new.txt")
-              newarticle = readfile(tempid "article.new.txt")
-              article = readfile(tempid "article.txt")
+              newarticle = strip(http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", name) "?action=raw"))
+              article = strip(readfile(tempid "article.txt"))
               if(length(newarticle) == 0 || length(article) == 0) {
                 abort("demon-lin.awk: Error unable to retrieve wikisource or article.txt. " name)
               }
+
               else {                                                    
                 if(length(article) != length(newarticle)) {
                   prnt("demon-lin.awk: Article lengths out of sync (old=" length(article) " new=" length(newarticle) "). Re-running Wayback Medic ...")
                   prnt("               old ID: " tempid)
-                  command = Exe["medic"] " -n \"" name "\" -p \"" Project["id"] "\""
+                  print article > tempid "article.old.txt"
+                  print newarticle > tempid "article.txt"
+                  close(tempid "article.old.txt")
+                  close(tempid "article.txt")
+                  command = Exe["bug"] " -n \"" name "\" -p \"" Project["id"] "\" -r"
                   system(command)
                   tempid = whatistempid(name, Project["index"] )
                   prnt("               new ID: " tempid)

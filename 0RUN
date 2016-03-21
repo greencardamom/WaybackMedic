@@ -37,7 +37,7 @@ ________________________________________________________________________________
    After medic has completed running, you can view the proposed article diffs to verify it is working before uploading to Wikipedia via AWB
 
    1. ./bug -n "Charles Dickens" -d c
-      (or "-d p" for uncolored plain text diff)
+      (or "-d p" for uncolored plain text diff if wdiff is not installed)
 
    2. ./bug -n "Charles Dickens" -v
       (to view data file locations and the command to re-run medic for that name)
