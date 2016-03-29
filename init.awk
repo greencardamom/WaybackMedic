@@ -12,7 +12,10 @@ BEGIN {
   Ramdisk = "/mnt/ramdisk/"
 
   # String included with http requests shows in remote logs. Include name of program and your contact info.
-  Agent = "WaybackMedic: en.wikipedia.org/wiki/User:Green_Cardamom/WaybackMedic"
+  Agent = "http://en.wikipedia.org/wiki/User:Green_Cardamom/WaybackMedic"
+
+  # Default wget options (include lead/trail spaces)
+  Wget_opts = " --no-cookies --ignore-length --user-agent=\"" Agent "\" --no-check-certificate --tries=5 --timeout=120 --waitretry=60 --retry-connrefused "
 
   Exe["rm"] = "/bin/rm"
   Exe["mv"] = "/bin/mv"
@@ -32,6 +35,7 @@ BEGIN {
   Exe["wget"] = "/usr/bin/wget"
   Exe["mkdir"] = "/bin/mkdir"
   Exe["uuidgen"] = "/usr/bin/uuidgen"
+  Exe["python3"] = "/usr/bin/python3"
 
   Exe["jq"] = "/usr/bin/jq"  # Version 1.5 
 

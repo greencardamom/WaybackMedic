@@ -63,14 +63,24 @@ function setProject(pid) {
 
         Project["auth"]   = Project["meta"] "auth"
         Project["index"]  = Project["meta"] "index"
+        Project["indextemp"]  = Project["meta"] "index.temp"
         Project["wayall"] = Project["meta"] "wayall"               # List of all IA links
-        Project["wayrm"]  = Project["meta"] "wayrm"                # IA links deleted from articles
+        Project["newiadate"] = Project["meta"] "newiadate"         # Log of cases when the IA snapshot date changed
+        Project["newaltarch"] = Project["meta"] "newaltarch"       # Log of cases when alternative archive's are added
         Project["manual"] = Project["meta"] "manual"               # Manual processing needed
         Project["timeout"] = Project["meta"] "timeout"             # Remote server timed out
+        Project["apimismatch"] = Project["meta"] "apimismatch"     # API returned fewer records than sent. name|sent|received
+        Project["jsonmismatch"] = Project["meta"] "jsonmismatch"   # API returned different size csv files. name|csv1|csv2
+        Project["servicename"] = Project["meta"] "servicename"     # Archive service name found is unknown. Update servicename() in medic.awk
         Project["bogusapi"] = Project["meta"] "bogusapi"           # IA API returned a bogus recommendation. Page actually works.
+        Project["bummer"] = Project["meta"] "bummer"               # Found a bummer page. 
         Project["docfixes"] = Project["meta"] "Documentation"      # Documentation / fix revisions for this project
         Project["cbignore"] = Project["meta"] "cbignore"           # {{cbignore|bot=medic}} was added to these articles
+        Project["critical"] = Project["meta"] "critical"           # Critical system errors
         Project["discovered"] = Project["meta"] "discovered"       # Articles that have changes made (for import to AWB)
+
+        Project["wayrm"]  = Project["meta"] "wayrm"                # IA links deleted from articles
+        Project["wayrmfull"]  = Project["meta"] "wayrmfull"        # Formated to be run through medic.awk for testing
 
         Project["log404"] = Project["meta"] "log404"
         Project["logspurone"] = Project["meta"] "logspurone"
@@ -139,11 +149,8 @@ function sys2var(command        ,fish, scale, ship) {
 #
 function http2var(url) {
 
-     # return sys2var( Exe["wget"] " --no-check-certificate --user-agent=\"" Agent "\" -q -O- \"" url "\"")
-
      if(url ~ /'/) gsub(/'/,"%27",url)  # Escape shell literal string
-     return sys2var( Exe["wget"] " --retry-connrefused --waitretry=1 --read-timeout=2 --timeout=5 --tries=1 --no-dns-cache --no-check-certificate --user-agent=\"" Agent "\" -q -O- '" url "'")
-
+     return sys2var( Exe["wget"] Wget_opts "-q -O- '" url "'")
 }
 
 
@@ -242,7 +249,7 @@ function stripwikimarkup(str) {
     safe = stripwikitemplates(safe)
     safe = stripwikirefs(safe)
     safe = stripwikilinks(safe)
-    return safe
+    return strip(safe)
 }
 
 #
@@ -251,12 +258,12 @@ function stripwikimarkup(str) {
 #      "George Henry is a [[lawyer]] from [[Charlesville (Virginia)|Charlesville Virginia]]"
 #
 function stripwikicomments(str, a,c,i,out,sep) {
-  c =  patsplit(str, a, /<![^>]*>/, sep)
+  c =  patsplit(strip(str), a, /<![^>]*>/, sep)
   out = sep[0]
   while(i++ < c) {
     out = out sep[i] 
   }
-  return out
+  return strip(out)
 }
 
 #
@@ -340,31 +347,32 @@ function exists(name    ,fd) {
 #
 # Log (append) a line in a database
 #
-#  If you need more than 2 columns (ie. name|msg) then format msg with | separate entries. 
+#  If you need more than 2 columns (ie. name|msg) then format msg with separators in the string itself. 
 #    If flag="noclose" don't close the file (flush buffer) after write. Useful when making many
-#      concurrent writes, particularly running under GNU parallel
+#      concurrent writes, particularly running under GNU parallel.
+#    If flag="space" use space as separator 
 #
-function sendlog(database, name, msg, flag) {
+function sendlog(database, name, msg, flag,    safed,safen,safem,sep) {
 
-  if(length(msg))
-    print name "|" msg >> database
+  safed = database
+  safen = name
+  safem = msg
+  gsub(/"/,"\42",safed)
+  gsub(/"/,"\42",safen)
+  gsub(/"/,"\42",safem)
+
+  if(flag ~ /space/)
+    sep = " " 
   else
-    print name >> database
+    sep = "----"
+
+  if(length(safem))
+    print safen sep safem >> database
+  else
+    print safen >> database
 
   if(flag !~ /noclose/)
     close(database)
-}
-
-#
-# Write to a database
-#   eg. sendto(Project["manual"], name, "choosetxt")            
-# The first argument will be uniqe in the file ie. any previous entry with the first argument is deleted and replaced with this one.
-#
-function sendto(database, name, msg,     command) {
-  command = Exe["awk"] " -v indexf=\"" database "\" -v name=\"" name  "\" -v stamp=\"" msg "\" -f " Home "index.awk"
-  if( sys2var(command) != 1) 
-    print("Error unable to write to database using command: " command ". " name ) > "/dev/stderr"
-
 }
 
 #
@@ -468,9 +476,49 @@ function isarchiveorg(url,  safe) {
   safe = url
   sub(/^https?[:]\/\//,"",safe)
   sub(/^web[.]|^www[.]|^wayback[.]/,"",safe)
-  if(safe ~ /^archive[.]org/)
-    return 1       
+  if(safe ~ /^archive[.]org/) { 
+    if(urltimestamp(safe) !~ /[*|?]/)          # Ignore if timestamp contains * or ?
+      return 1      
+  } 
   return 0
+}
+
+
+#
+# Given an archive.org URL, return the original url portion
+#  http://archive.org/web/20061009134445/http://timelines.ws/countries/AFGHAN_B_2005.HTML ->
+#   http://timelines.ws/countries/AFGHAN_B_2005.HTML
+#
+function wayurlurl(url,  date,inx) {
+
+   date = urltimestamp(url)
+   if(date && isanumber(date)) {
+     inx = index(url, date) + length(date) + 1
+     return removesection(url, 1, inx)
+   }
+}
+
+#                     
+# Given an archive.org URL, return the date stamp portion
+#  https://archive.org/web/20061009134445/http://timelines.ws/countries/AFGHAN_B_2005.HTML ->
+#   20061009134445                  
+#
+function urltimestamp(url,  a,c,i,re) {                
+
+  re = "^web$"
+
+  c = split(url, a, "/")
+  while(i++ < c) {             
+    if(length(a[i])) {
+      if(a[i] ~ re) {
+        i++
+        return a[i]
+      }
+      if(a[i] ~ /^[0-9]*$/) {
+        return a[i]
+      }
+    }
+  }
 }
 
 #
@@ -792,76 +840,220 @@ function mkdir(dir,    ret, var, cwd) {
   return 1
 }
 
-#
-# URL-encode limited set of characters needed for Wikipedia templates
-#    https://en.wikipedia.org/wiki/Template:Cite_web#URL
-#
-function urlencodelimited(url,  safe) {
 
-  safe = url
-  gsub(/[ ]/, "%20", safe)
-  gsub(/["]/, "%22", safe)
-  gsub(/[']/, "%27", safe)
-  gsub(/[<]/, "%3C", safe)
-  gsub(/[>]/, "%3E", safe)
-  gsub(/[[]/, "%5B", safe)
-  gsub(/[]]/, "%5D", safe)
-  gsub(/[{]/, "%7B", safe)
-  gsub(/[}]/, "%7D", safe)
-  gsub(/[|]/, "%7C", safe)
-  return safe
+#
+# Given a URI, return percent-encoded in the hostname (limited), path and query portion only. Retain +
+#
+#  Doesn't do international hostname encoding "http://你好.com/" different from percent encoding
+#
+#  Example:
+#  https://www.cwi.nl:80/guido&path/Python/http://www.test.com/Władysław T. Benda.com ->
+#    https://www.cwi.nl:80/guido%26path/Python/http%3A//www.test.com/W%C5%82adys%C5%82aw%20T.%20Benda.com
+#
+#  Documentation: https://docs.python.org/3/library/urllib.parse.html
+#                 http://www.programcreek.com/python/example/53325/urllib.parse.urlsplit
+#                 https://pymotw.com/2/urlparse/
+#
+function uriparseEncodeurl(str,   safe,command) {
+
+  safe = str
+  gsub(/'/, "'\"'\"'", safe)     # make safe for shell
+  gsub(/’/, "'\"’\"'", safe)
+
+  command = Exe["python3"] " -c \"from urllib.parse import urlunsplit, urlsplit, quote; import sys; o = urlsplit(sys.argv[1]); print(urlunsplit((o.scheme, o.netloc, quote(o.path), quote(o.query), o.fragment)))\" '" safe "'"
+  return sys2var(command)
+}
+
+#
+# url-decode via Python 
+#
+function urldecodepython(str,   command,safe) {
+
+   safe = str
+   gsub(/'/, "'\"'\"'", safe)    
+   gsub(/’/, "'\"’\"'", safe)
+
+   command = Exe["python3"] " -c \"from urllib.parse import unquote; import sys; print(unquote(sys.argv[1]))\" '" safe "'"
+   return strip(sys2var(command))
+}
+
+#
+# Given a URI, return a sub-portion (scheme, netloc, path, query, fragment)
+#
+#  In the URL "https://www.cwi.nl:80/nl?dooda/guido&path.htm#section"
+#   scheme = https
+#   netloc = www.cwi.nl:80
+#   path = /nl
+#   query = dooda/guido&path.htm
+#   fragment = section
+#
+#  Example: uriElement("https://www.cwi.nl:80/nl?", "path") returns "/nl"
+#
+function uriparseElement(str, element,   safe,command,scheme) {
+  safe = str               
+  gsub(/'/, "'\"'\"'", safe)
+  gsub(/’/, "'\"’\"'", safe)              
+  command = Exe["python3"] " -c \"from urllib.parse import urlsplit; import sys; o = urlsplit(sys.argv[1]); print(o." element ")\" '" safe "'"
+  return sys2var(command)
+}
+
+
+
+#
+#   Maintain index file. This will add a new entry and remove (re-pack) any prior name-duplicate entries 
+#     keeping chronological order of addition.
+#
+# pass variables:
+#               stamp = code or message on the right side of separateor eg. John Smith|wi-awb-12344545
+#                        if stamp is blank (eg. -v stamp="") then there is no separator and a 1D flat file.
+#                        Responsibility of calling program to ensure all calls to database are consistent about blank
+#                        stamp value otherwise things will get garbaled. 
+#               name = wikipedia article name complete no underscore. Name on left side of separator
+#               indexf = name of index file *with full path* !!
+#
+
+function sendtoindex(indexf, name, stamp,    debugfile,sep,c,a,filep,i,b,curname,o,hold2,hold) {
+
+  debugfile = Home "debug.index"
+
+  sep = "|"
+
+  if( ! length(name) > 1 || ! length(stamp) > 1 || ! length(indexf) > 1 ) {
+    print name "|" filename "|4" >> debugfile
+    close(debugfile)
+    return 0
+  }
+
+  c = split(indexf, a, "/")
+  filename = a[c]
+  if( ! awklock(filename) ) {
+    awkunlock(filename,name,"1")
+    return 0
+  }
+
+  if(! checkexists(indexf, "sendtoindex", "check") ) {
+    print name sep stamp > indexf
+    close(indexf)
+    awkunlock(filename)
+    return 1
+  }
+  else {
+    print name sep stamp >> indexf
+    close(indexf)
+    filep = readfile(indexf)
+    c = split(filep, a, "\n")
+    filep = ""
+    while(i++ < c) {
+      split(a[i], b, sep)
+      curname = strip(b[1])
+      hold[curname]["name"] = curname
+      hold[curname]["stamp"] = strip(b[2])
+      hold[curname]["index"] = i
+    }
+  }
+
+ # re-index to prepare for sorting
+  for(o in hold) {
+    hold2[ hold[o]["index"] ]["name"] = hold[o]["name"]
+    hold2[ hold[o]["index"] ]["stamp"] = hold[o]["stamp"]
+  }
+
+  delete hold
+
+  if(!removeindexfile(indexf,filename)) 
+    return 0
+
+  PROCINFO["sorted_in"] = "@ind_num_asc"
+  for(o in hold2) {
+    if( length(hold2[o]["name"]) > 0 ) {
+      print hold2[o]["name"] sep hold2[o]["stamp"] >> indexf
+    }
+  }
+
+  close(indexf)
+  if(length(hold2) > 0) {
+    awkunlock(filename)
+    return 1
+  }
+  else {
+    awkunlock(filename)
+    print name "|" filename "|3" >> debugfile
+    close(debugfile)
+    return 0
+  }
+
+  awkunlock(filename)
+  return 0
+}
+
+#
+# Delete index file
+#
+function removeindexfile(str, filename) {
+
+      if( checkexists(str, "index.awk", "check") ) {
+        sys2var( Exe["rm"] " -- " str)
+        system("")
+      }
+      if( checkexists(str, "index.awk", "check") ) {
+        print("index.awk: Unable to delete " str ", aborting.") > "/dev/stderr"
+        awkunlock(filename)
+        return 0
+      }
+      return 1
+}
+
+# Lock database with mkdir method and error status returned by OS
+#
+function awklock(filename,  status,count) {
+
+  # mkdir lock 2>/dev/null ; echo $?
+
+  while(1) {       
+    status = sys2var( Exe["mkdir"] " /tmp/lock." filename " 2>/dev/null ; echo $?")
+    if(count > 20) {
+      print "Error in init.awk: awklock() - stuck lock file /tmp/lock." filename > "/dev/stderr"    
+      return 0
+    }
+    if(status != 0) {
+      sleep(2)
+      count++       
+    }
+    else                 
+      break      
+  }
+  return 1                       
+}          
+
+#
+# Remove lockfile
+#
+function awkunlock(filename, name, point) {
+
+  if(name) {
+    print name "|" filename "|" point >> debugfile
+    close(debugfile)
+  }
+
+  if(exists("/tmp/lock." filename)) {
+    sys2var( Exe["rm"] " -r -- /tmp/lock." filename)
+  }
+  else {
+  }
 
 }
 
 #
-# URL-decode awk method. 
-#  Adaption credit: http://www.shelldorado.com/scripts/cmds/urldecode
+# Convert XML to plain
 #
-function urldecode(url,  hextab,decoded,len,i,c,c1,c2,code,encodedLF,str) {
+function convertxml(str,   safe) {
 
-        str = url
-        encodedLF = 0 # set to 1 to decode linefeed character
-
-	hextab ["0"] = 0;	hextab ["8"] = 8;
-	hextab ["1"] = 1;	hextab ["9"] = 9;
-	hextab ["2"] = 2;	hextab ["A"] = hextab ["a"] = 10
-	hextab ["3"] = 3;	hextab ["B"] = hextab ["b"] = 11;
-	hextab ["4"] = 4;	hextab ["C"] = hextab ["c"] = 12;
-	hextab ["5"] = 5;	hextab ["D"] = hextab ["d"] = 13;
-	hextab ["6"] = 6;	hextab ["E"] = hextab ["e"] = 14;
-	hextab ["7"] = 7;	hextab ["F"] = hextab ["f"] = 15;
- 
-    	decoded = ""
-	i   = 1
-	len = length (str)
-	while ( i <= len ) {
-	    c = substr (str, i, 1)
-	    if ( c == "%" ) {
-	    	if ( i+2 <= len ) {
-		    c1 = substr (str, i+1, 1)
-		    c2 = substr (str, i+2, 1)
-		    if ( hextab [c1] == "" || hextab [c2] == "" ) {
-			print "WARNING (urldecode): invalid hex encoding: %" c1 c2 > "/dev/stderr"
-		    } else {
-		    	code = 0 + hextab [c1] * 16 + hextab [c2] + 0
-		    	#print "\ncode=", code
-		    	c = sprintf ("%c", code)
-			i = i + 2
-		    }
-		} else {
-		    print "WARNING (urldecode): invalid % encoding: " substr (str, i, len - i) > "/dev/stderr"
-		}
-	    } else if ( c == "+" ) {	# special handling: "+" means " "
-	    	c = " "
-	    }
-	    decoded = decoded c
-	    ++i
-	}
-	if ( encodedLF ) {
-	    return decoded	# no line newline on output
-	} else {
-	    return decoded
-	}
+      safe = str
+      gsub(/&lt;/,"<",safe)
+      gsub(/&gt;/,">",safe)
+      gsub(/&quot;/,"\"",safe)
+      gsub(/&amp;/,"\\&",safe)
+      gsub(/&#039;/,"'",safe)
+      return safe
 }
-
 

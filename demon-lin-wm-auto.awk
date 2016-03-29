@@ -45,7 +45,7 @@ BEGIN {
   setProject(pid)     # library.awk .. load Project[] paths via project.cfg
                       # if -p not given, use default noted in project.cfg
 
-  if( delay == "" || (delay < 12 && delay > 0) || ! isanumber(delay) ) {
+  if( delay == "" || (delay < 12 && delay > 0) || ! isanumber(delay) ) 
     delay = 15 
   else if(delay == 0) 
     delay = 0
@@ -58,8 +58,10 @@ BEGIN {
 
 function main(    name,tempid,article,command) {
 
-  removefile(Ramdisk "article.txt")              # Clear out old files
-  removefile(Ramdisk "abort.txt")              
+  removefile(Ramdisk "abort.txt")                # Clear out old files. demon-lin should always be run as the first step, before AWB starts processing.
+  removefile(Ramdisk "done.txt")              
+  removefile(Ramdisk "article.txt")              
+  removefile(Ramdisk "name.txt")              
 
   prnt("\ndemon-lin.awk: Waiting for " Ramdisk "name.txt ...")
 
@@ -80,8 +82,8 @@ function main(    name,tempid,article,command) {
       name = strip( readfile(Ramdisk "name.txt") )
       prnt("demon-lin.awk: New job request: " name )
       removefile(Ramdisk "name.txt")
-      removefile(Ramdisk "article.txt")
-
+      removefile(Ramdisk "done.txt")
+     
       if(length(name) > 0) {           
           tempid = whatistempid(name, Project["index"] )
           if(tempid == "" || tempid == 0) {
@@ -89,13 +91,11 @@ function main(    name,tempid,article,command) {
           }         
           else {
             if(checkexists(tempid "article.waybackmedic.txt"))  {  # Skip if no changes were made.
-
               newarticle = strip(http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", name) "?action=raw"))
               article = strip(readfile(tempid "article.txt"))
               if(length(newarticle) == 0 || length(article) == 0) {
                 abort("demon-lin.awk: Error unable to retrieve wikisource or article.txt. " name)
               }
-
               else {                                                    
                 if(length(article) != length(newarticle)) {
                   prnt("demon-lin.awk: Article lengths out of sync (old=" length(article) " new=" length(newarticle) "). Re-running Wayback Medic ...")
@@ -104,19 +104,24 @@ function main(    name,tempid,article,command) {
                   print newarticle > tempid "article.txt"
                   close(tempid "article.old.txt")
                   close(tempid "article.txt")
+                  if( checkexists(tempid "article.waybackmedic.txt") )
+                    removefile(tempid "article.waybackmedic.txt")                    
                   command = Exe["bug"] " -n \"" name "\" -p \"" Project["id"] "\" -r"
                   system(command)
-                  tempid = whatistempid(name, Project["index"] )
+                  tempid = whatistempid(name, Project["index"] )  # tempid shouldn't change 
                   prnt("               new ID: " tempid)
                   article = readfile(tempid "article.txt")
                   if(length(article) == 0) 
                     abort("demon-lin.awk: Error unable to run Wayback Medic. " name)
                 }
-                if(checkexists(tempid "article.waybackmedic.txt") ) {
-                  command = Exe["cp"] " " tempid "article.waybackmedic.txt " Ramdisk "article.txt"
+                if(checkexists(tempid "article.waybackmedic.txt")) {
+                  article = readfile(tempid "article.waybackmedic.txt")
+                  print article > Ramdisk "article.txt"
+                  close(Ramdisk "article.txt")                  
                   prnt("demon-lin.awk: Status successful. Copying article.waybackmedic.txt to shared directory. " name)
                   sleep( delay )
-                  sys2var(command)
+                  print "done" > Ramdisk "done.txt"
+                  close(Ramdisk "done.txt")
                 }
                 else {
                   prnt("\ndemon-lin.awk: No changes to article.")

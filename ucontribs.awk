@@ -154,12 +154,14 @@ function uniq(names,    b,c,i,x) {
         return join2(x,"\n")
 }
 
-function convertxml(str) {
-      gsub(/&lt;/,"<",str)
-      gsub(/&gt;/,">",str)
-      gsub(/&quot;/,"\"",str)
-      gsub(/&amp;/,"\\&",str)
-      gsub(/&#039;/,"'",str)
-      return str
+function convertxml(str,   safe) {
+      
+      safe = str
+      gsub(/&lt;/,"<",safe)
+      gsub(/&gt;/,">",safe)
+      gsub(/&quot;/,"\"",safe)
+      gsub(/&amp;/,"\\&",safe)
+      gsub(/&#039;/,"'",safe)
+      return safe
 }
 

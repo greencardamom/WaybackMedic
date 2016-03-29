@@ -155,13 +155,13 @@ function getindex(name,  a) {
 function whatistempid(name, filepath,      s, a, re) {  
 
   if(! checkexists(filepath) ) {
-    abort("demon-lin.awk: Error unable to find " filepath ". " name )
+    print("demon-lin.awk: Error unable to find " filepath ". " name )
     return 0    
   }
-  re = "^" regesc2(strip(name)) "$"
+  re = "^" regesc2(strip(tolower(name))) "$"
   while ((getline s < filepath ) > 0) {
     split(s, a, "|")
-    if(strip(a[1]) ~ re) {
+    if(strip(tolower(a[1])) ~ re) {
       close(filepath)
       return strip(s)
     }               

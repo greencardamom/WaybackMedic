@@ -50,9 +50,12 @@ BEGIN {
 
   setProject(pid)     # library.awk .. load Project[] paths via project.cfg
 
-  wm_temp = Project["data"] "wm-" sys2var( Exe["date"] " +\"%m%d%H%M%S\"") "/" 
-  if(!mkdir(wm_temp))
+  nano = substr(sys2var( Exe["date"] " +\"%N\""), 1, 4)
+  wm_temp = Project["data"] "wm-" sys2var( Exe["date"] " +\"%m%d%H%M%S\"") nano "/" 
+  if(!mkdir(wm_temp)) {
+    print "driver.awk: unable to create temp file" > "/dev/stderr"
     exit
+  }
 
 # Save wikisource
   print http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", namewiki) "?action=raw") > wm_temp "article.txt"
@@ -65,14 +68,26 @@ BEGIN {
 # Save namewiki
   print namewiki > wm_temp "namewiki.txt"
 
-# Create index entry
-  sendto(Project["index"], namewiki, wm_temp)
+# Create index.temp entry (re-assemble when GNU Parallel is done with "project -j") 
+
+  print namewiki "|" wm_temp >> Project["indextemp"]
+  close(Project["indextemp"])
+
+#  if(!sendtoindex(Project["index"], namewiki, wm_temp)) {
+#    print "driver.awk: ERROR with " name ". Unable to update index file." > "/dev/stderr"
+#    print "driver.awk: ERROR with " name ". Unable to update index file." >> Project["critical"]
+#    close(Project["critical"])
+#    exit
+#  }
+
 
 # Run medic
 
-  print "\n"namewiki"\n"
+  print "\n"namewiki"\n" > "/dev/stderr"
+  safe = namewiki
+  gsub(/["]/,"\\\"",safe)
 
-  command = Exe["medic"] " -p \"" Project["id"] "\" -n \"" namewiki "\" -s \"" wm_temp "\"article.txt"  
+  command = Exe["medic"] " -p \"" Project["id"] "\" -n \"" safe "\" -s \"" wm_temp "\"article.txt"  
   changes = sys2var(command)
   if(changes) {
     print "    Found " changes " change(s) for " namewiki > "/dev/stderr"
@@ -83,8 +98,8 @@ BEGIN {
       sys2var( Exe["rm"] " -- " wm_temp "article.waybackmedic.txt")
     }
   }
-
 }
+
 
 function usage() {
 

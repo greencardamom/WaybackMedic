@@ -33,7 +33,7 @@
 
 BEGIN {
 
-  while ((C = getopt(ARGC, ARGV, "abicxhp:d:m:s:")) != -1) { 
+  while ((C = getopt(ARGC, ARGV, "jyabicxhp:d:m:s:")) != -1) { 
       opts++
       if(C == "p")                 #  -p <project>   Use project name. No default.
         pid = verifypid(Optarg)
@@ -43,8 +43,12 @@ BEGIN {
         mid = verifyval(Optarg)
       if(C == "c")                 #  -c             Create project files. -p required
         type = "create"
-      if(C == "i")                 #  -i             Create index from data directory. -p required
+      if(C == "i")                 #  -i             Build index from scratch from data directory. -p required
         type = "index"
+      if(C == "y")                 #  -y             Check for corruption in data files. -p required
+        type = "corrupt"
+      if(C == "j")                 #  -j             Re-assemble index file after all driver's completed. -p required
+        type = "assemble"
       if(C == "x")                 #  -x             Delete project files. -p required
         type = "delete"
       if(C == "a")                 #  -a             Verify fixemptyarchive. -p required
@@ -63,7 +67,7 @@ BEGIN {
   }
 
  # No options or an empty -p given
-  if( type == "" || (type ~ /delete|create|index/ && pid == "") || pid ~ /error/ ){
+  if( type == "" || (type ~ /delete|create|index|corrupt|assemble/ && pid == "") || pid ~ /error/ ){
     usage()
     exit
   }
@@ -94,6 +98,16 @@ BEGIN {
 
   if(type ~ /index/ ) {
     makeindex(pid,did,mid)
+    exit
+  }
+
+  if(type ~ /corrupt/ ) {
+    corruption(pid,did,mid)
+    exit
+  }
+
+  if(type ~ /assemble/ ) {
+    assemble(pid,did,mid)
     exit
   }
 
@@ -227,7 +241,7 @@ function makeindex(pid,did,mid,    data,meta,a) {
     print "Unable to find " data " OR " meta
     exit
   }
-  if(checkexists(meta "ia9out-index")){
+  if(checkexists(meta "index")){
     print "File exists, aborting."
     print "To delete: rm " meta "index"
     exit
@@ -246,6 +260,73 @@ function makeindex(pid,did,mid,    data,meta,a) {
 
 }
 
+#
+# Check for data corruption. 
+#  If namewiki string is not contained in article.txt 
+#
+function corruption(pid,did,mid,    data,meta,a,namewiki,command) {
+
+  data = did pid "/"
+  meta = mid pid "/"
+
+  if( ! checkexists(data) || ! checkexists(meta) ) {
+    print "Unable to find " data " OR " meta
+    exit
+  }
+
+  # list directories only
+  # https://stackoverflow.com/questions/14352290/listing-only-directories-using-ls-in-bash-an-examination
+  c = split( sys2var(Exe["ls"] " -d1 " data "wm*/"), a, "\n")
+  while(i++ < c) {
+    if( ! exists(a[i] "namewiki.txt") )
+      print "Unable to find " a[i] "namewiki.txt" > "/dev/stderr"
+    else {
+      namewiki = readfile(a[i] "namewiki.txt") 
+      gsub(/["]/,"\\\"",namewiki)
+      command = Exe["grep"] " -c \"" namewiki "\" " a[i] "article.txt"
+      if(sys2var(command) == "0") {
+        print a[i]
+      }
+    }
+  }
+  close(meta "index")
+
+}
+
+
+#
+# Assemble index from index.temp post-GNU parallel 
+#
+function assemble(pid,did,mid,   data,meta) {
+
+  data = did pid "/"
+  meta = mid pid "/"
+
+  if(!checkexists(meta "index.temp")) {
+    print "Unable to find " meta "index.temp" 
+    exit
+  }
+
+  if(!checkexists(meta "index")) {                          # If no index, just rename file
+    sys2var(Exe["mv"] " " meta "index.temp " meta "index")
+    exit
+  }
+
+  sys2var(Exe["cp"] " " meta "index " meta "index.orig")
+
+  c = split(readfile(meta "index.temp"), a, "\n")           # index.temp was created by driver.awk
+  while(i++ < c) {
+    split(a[i], b, "|")
+    if(!sendtoindex(meta "index", b[1], b[2])) {
+      print "driver.awk: ERROR with " b[1] ". Unable to update " meta "index" > "/dev/stderr"
+      exit
+    }
+  }
+}
+
+#
+# Delete project
+#
 function deleteproject(pid,mid,did,    i,c,re,a) {
 
  # Delete Data and Meta directories
@@ -303,7 +384,7 @@ function deleteproject(pid,mid,did,    i,c,re,a) {
 #
 function check_fixemptyarchive(pid, did, mid,    command,files,stampdir,c,i,re) {
 
-  re = "archive[-]?url=[ ]?[|}]"
+  re = "archive[-]?url[ ]{0,}=[ ]{0,}[|}]"
   files = sys2var(Exe["ls"] " " did pid "/")
   c = split(files, stampdir, "\n")
   while(i++ < c) {
@@ -390,7 +471,9 @@ function usage() {
   print "Project - manage projects."
   print ""
   print "Usage:"
-  print "       -i             Create index from ~/data files. -p required"
+  print "       -i             Build index from ~/data files. CAUTION: only use if data dir is fresh (one run of medic). -p required"
+  print "       -y             Check for data corruption. See project.awk source for description. -p required"
+  print "       -j             Re-assemble index file after all drivers (via parallel) is completed. -p required." 
   print "       -c             Create project files. -p required"
   print "       -x             Delete project files. -p required"
   print "       -p <project>   Project name."

@@ -7,13 +7,13 @@ Instructions for installing WaybackMedic and configuring AWB
 
 1. Download all WaybackMedic files to a directory (eg. /home/user/wm)
 
-2. If not already, install the following programs:
+2. The following programs are required:
 
     GNU Awk 4.1+
     GNU Parallel 
-    jq 1.5+       (https://stedolan.github.io/jq/)
-    wget
-    wdiff         (apt-get install wdiff) (optional)
+    jq 1.5+       (for JSON conversion - https://stedolan.github.io/jq/)
+    Python 3      (for url parsing/encoding)
+    wdiff         (for colored inline diffs - apt-get install wdiff) (optional)
     
 2. Create two sub-directories "data" and "meta" (eg. mkdir data; mkdir meta)
 
