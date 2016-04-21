@@ -47,12 +47,12 @@
 
 BEGIN {
 
-  Debug["network"] = 0    # Print debugging for networking
-  Debug["api"] = 0        # Print debugging for API
+  Debug["network"] = 1    # Print debugging for networking
+  Debug["api"] = 1        # Print debugging for API
   Debug["s"] = 0          # Print debugging for replacetext() functions in library.awk
   Debug["e"] = 0          # Print debugging for fixemptywayback()
   Debug["process"] = 0    # Print debugging for process_()
-  Debug["wgetlog"] = 0    # Save wget.* header info created by webpagestatus()
+  Debug["wgetlog"] = 1    # Save wget.* header info created by webpagestatus()
 
   while ((C = getopt(ARGC, ARGV, "hp:n:s:")) != -1) {
       opts++
@@ -210,12 +210,27 @@ function fixemptyarchive(tl,   k,url,urlarch,newurl,newdate,urlencoded,status) {
     url = getargurl(tl)
     urlencoded = uriparseEncodeurl(urldecodepython(url))
     if(urlencoded ~ /^http/) {
-      status = webpagestatus(urlencoded)
+
+      if(Debug["network"]) print "Checking fixemptyarchive step 1"
+      status = webpagestatus(url)
       if( status == 1 || status == 3)             # Leave empty arguments in place if url= is working 
         return tl
-      Changes++                                   # Else remove them and leave a dead link tag
+
+      if(Debug["network"]) print "Checking fixemptyarchive step 2"
+      status = webpagestatus(urlencoded)          # Try again with encoding
+      if( status == 1 || status == 3)            
+        return tl
+
+      if(Debug["network"]) print "Checking fixemptyarchive step 3"
+      sleep(2)
+      status = webpagestatus(url)                 # Try third time after pause
+      if( status == 1 || status == 3)            
+        return tl
+
+      Changes++                                   # Remove the empty arguments and leave a dead link tag
       sendlog(Project["logemptyarch"], name, "cite1")
       return removearchive(tl, "nocbignore")
+
     }
     else {
       Changes++
@@ -292,7 +307,7 @@ function fixbadstatus(tl, fullref,    urlarch,url,newurl,newdate,waybackdate,i,s
 
     url = getargurl(tl)
     waybackdate = getargwayback(tl,"date")
-    urlarch = formatediaurl("https://web.archive.org/web/" waybackdate "/" url)
+    urlarch = formatediaurl("https://web.archive.org/web/" waybackdate "/" url, "barelink")
 
     if(length(url) > 10 && url ~ /^http/ && isarchiveorg(urlarch) && isanumber(waybackdate) ) {
       newurl = api(urlarch)
@@ -507,7 +522,7 @@ function getargarchive(tl, arg, magic,    k,s,b,re,subre,safe) {
   else if(arg ~ /dead/)
     subre = "dead[-]{0,1}url"
   else
-    return tl
+    print "Error in getargarchive() for (" name "): unknown arg" > "/dev/stderr"
 
   gsub(/\n/, " ", tl)  # collapse multi-line templates
 
@@ -540,6 +555,7 @@ function getargarchive(tl, arg, magic,    k,s,b,re,subre,safe) {
     s = substr(strip(k[0]), 1, length(strip(k[0])) - 1)
     return stripwikicomments(s)
   }
+
 }
 
 #
@@ -1017,17 +1033,19 @@ function replacefullref(fullref, old, new, caller,   re1,re2,c,origfullref) {
 #   target = "waybackoutside" .. Wayback templates outside ref pairs
 #   target = "bareoutside"    .. Bare links outside ref pairs
 #
-function process_article(action, target,    c,b,i,tl,k,d,url,date,uuid,articlenoref,orig) {
+function process_article(action, target,    c,b,i,tl,k,d,url,date,uuid,articlenoref,orig,re) {
 
    if(action !~ /getlinks|format|process/) {
-     print "Error in parsearticle: no right action defined" > "/dev/stderr"
+     print "Error in process_article: no right action defined" > "/dev/stderr"
      return
    }
    if(target !~ /citeinside|citeoutside|waybackinside|waybackoutside|bareoutside/) {
-     print "Error in parsearticle: no right target defined" > "/dev/stderr"
+     print "Error in process_article: no right target defined" > "/dev/stderr"
      return
    }
 
+   # Citation templates regex search. 
+   re = "[{][ ]{0,}[Cc]ite[^}]+}|[{][ ]{0,}[Cc]ita[^}]+}|[{][ ]{0,}[Vv]cite[^}]+}|[{][ ]{0,}[Vv]ancite[^}]+}|[{][ ]{0,}[Hh]arvrefcol[^}]+}|[{][ ]{0,}[Cc]itation[^}]+}"
 
  # Cite or Wayback templates inside ref pairs
    if(target ~ /citeinside|waybackinside/) {
@@ -1039,9 +1057,8 @@ function process_article(action, target,    c,b,i,tl,k,d,url,date,uuid,articleno
        k = substr(b[i], 1, match(b[i], "</ref>") - 1)
     # Cite templates
        if(k ~ /archive[-]{0,1}url[ ]{0,}=/ && ! cbignore(k, "cite") && ! bundled(k, "cite") && target ~ /citeinside/ ) {   
-         # Note: the following match string is slightly different from the similar one below
-         match(k, /[{][ ]{0,1}[{][ ]{0,}[Cc]ite[^}]+}|{[ ]{0,}[Cc]ita[^}]+}|{[ ]{0,}[Vv]cite[^}]+}|{[ ]{0,}[Vv]ancite[^}]+}|{[ ]{0,}[Hh]arvrefcol[^}]+}|{[ ]{0,}[Cc]itation[^}]+}/, d) 
-         orig = tl = d[0] "}" 
+         match(k, re, d) 
+         orig = tl = "{" d[0] "}" 
          url = getargarchive(tl, "url", "clean")
          if( isarchiveorg(url) ) {
            if( action ~ /format/ ) {
@@ -1069,6 +1086,15 @@ function process_article(action, target,    c,b,i,tl,k,d,url,date,uuid,articleno
          }
        }
     # Wayback templates 
+       else if(k ~ /[{][{][Ww]ayback[}][}]/) {  # Operationa on full reference string
+         if(action ~ /format/) {
+           orig = k
+           k = fixemptywayback(k)
+           if(orig != k) {
+             ArticleWork = replacefullref(orig, orig, k, "process_article4")
+           }
+         }
+       }                                        # Operations on wayback template string only
        else if(k ~ /[Ww]ayback[ ]{0,}[|]/ && ! cbignore(k, "wayback") && ! bundled(k, "wayback") && target ~ /waybackinside/ ) {
          match(k, /{[ ]{0,}[Ww]ayback[^}]+}/, d)
          orig = tl = "{" d[0] "}"
@@ -1107,23 +1133,22 @@ function process_article(action, target,    c,b,i,tl,k,d,url,date,uuid,articleno
      gsub(/<ref[^>]*\/[ ]{0,}>/,"",articlenoref)  # remove <ref name=string />
      c = split(articlenoref, b, "<ref[^>]*>")      # remove <ref></ref>      
      i = 1
-     while(i++ < c){
+     while(i++ < c)
        articlenoref = replacetext(articlenoref, substr(b[i], 1, match(b[i], "</ref>") - 1), "","process_article5")
-    }
 
     # Cite templates outside ref pairs
      if(target ~ /citeoutside/ ) {
-       c = split(articlenoref, b, /[{][ ]{0,}[{]/)
+       c = split(articlenoref, b, /[{][{]/)
        i = 0
        while(i++ < c) {
          tl = k = ""
          delete d
-         k = substr(b[i], 1, match(b[i], /[}][ ]{0,}[}]/) - 1)
+         k = substr(b[i], 1, match(b[i], /[}][}]/) - 1)
          if(k ~ /archive[-]{0,1}url[ ]{0,}=/ && ! cbignorebareline(ArticleWork, k, "citeoutside") ) {
-           k = "{" k "}"          
-           # Note: the following match string is slightly different from the similar one above
-           match(k, /[{][ ]{0,}[Cc]ite[^}]+}|{[ ]{0,}[Cc]ita[^}]+}|{[ ]{0,}[Vv]cite[^}]+}|{[ ]{0,}[Vv]ancite[^}]+}|{[ ]{0,}[Hh]arvrefcol[^}]+}|{[ ]{0,}[Cc]itation[^}]+}/, d) 
-           orig = tl = d[0] "}"
+           k = "{{" k "}}"          
+           match(k, re, d) 
+#           match(k, /[{][ ]{0,}[Cc]ite[^}]+}|{[ ]{0,}[Cc]ita[^}]+}|{[ ]{0,}[Vv]cite[^}]+}|{[ ]{0,}[Vv]ancite[^}]+}|{[ ]{0,}[Hh]arvrefcol[^}]+}|{[ ]{0,}[Cc]itation[^}]+}/, d) 
+           orig = tl = "{" d[0] "}"
            url = getargarchive(tl, "url", "clean")
            if(url ~ /^http/ && isarchiveorg(url)) {
              if(action ~ /format/) {
@@ -1149,10 +1174,10 @@ function process_article(action, target,    c,b,i,tl,k,d,url,date,uuid,articleno
     # Wayback templates outside ref pairs -- DISABLED. Possible source of errors needs more debugging. Cyberbot does not add wayback outside refs.
     # if(target ~ /waybackoutside/ ) {
     if(0 == 1) {
-       c = split(articlenoref, b, /[{][ ]{0,}[{]/)
+       c = split(articlenoref, b, /[{][{]/)
        i = 0
        while(i++ < c) {
-         k = substr(b[i], 1, match(b[i], /[}][ ]{0,}[}]/) - 1)
+         k = substr(b[i], 1, match(b[i], /[}][}]/) - 1)
          if(k ~ /^[ ]{0,}[Ww]ayback[ ]{0,}[|]/ && ! cbignorebareline(ArticleWork, k, "waybackoutside") ) { 
            orig = tl = k
            url = getargwayback(tl, "url")
@@ -1207,16 +1232,9 @@ function process_article(action, target,    c,b,i,tl,k,d,url,date,uuid,articleno
        }
      }
    }
-
-   if(action ~ /getlinks/) {
-     c = 0
-     for(i in WayLink) 
-       c++
-     return c
-   }
 }
 
-function main(  c,i,num) {
+function main(  i,num) {
 
    Article = readfile(sourcefile)
    ArticleC = split(Article, ArticleS, "\n")
@@ -1225,7 +1243,7 @@ function main(  c,i,num) {
    documentation()
    setdatetype()
 
-   Changes = c = num = 0
+   Changes = num = 0
 
   # Fix pure formating problems 
    process_article("format", "bareoutside")
@@ -1237,11 +1255,11 @@ function main(  c,i,num) {
    process_article("getlinks", "bareoutside")
    process_article("getlinks", "citeoutside")
    process_article("getlinks", "waybackinside")
-   num = process_article("getlinks", "citeinside")
+   process_article("getlinks", "citeinside")
 
-   if(Debug["api"] && num > 0) print "\nFound [" num "] links:\n"
    for(i in WayLink) {
-     c++
+     num++
+     if(Debug["api"] && num == 1) print "\nFound [" num "] links:\n"
      if(Debug["api"]) {
        print "  WayLink[" i "][\"origiaurl\"] = " WayLink[i]["origiaurl"]
        print "  WayLink[" i "][\"origurl\"] = " WayLink[i]["origurl"]
@@ -1255,7 +1273,7 @@ function main(  c,i,num) {
    }
    close(Project["wayall"])
 
-   if( queryapipost(c) ) {                         # -> api.awk
+   if( queryapipost(num) ) {                         # -> api.awk
      process_article("process", "bareoutside")
      process_article("process", "citeoutside")
      process_article("process", "waybackinside")

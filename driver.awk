@@ -67,6 +67,7 @@ BEGIN {
 
 # Save namewiki
   print namewiki > wm_temp "namewiki.txt"
+  close(wm_temp "namewiki.txt")
 
 # Create index.temp entry (re-assemble when GNU Parallel is done with "project -j") 
 

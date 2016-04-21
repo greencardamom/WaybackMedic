@@ -156,10 +156,19 @@ function queryapipost(internalcount,    postfile,postdir,command,i,c,csv,c2,csv2
               sendlog(Project["critical"], name, " 503_servers_down A1")
               return 0
             }
-            else if(status != 1 && status != 3) {                         # Page headers verified *not* 200
-              if(Debug["network"]) print "Step A1: NOT FOUND. Page headers verified *not* 200"
-              sendlog(Project["bogusapi"], name, WayLink[tag]["newiaurl"] " A1")
-              fillway(tag, "0", "false", "none", "none")
+            else if(status != 1 && status != 3) {                         # Page headers *not* 200 .. sleep and try again.. 
+              sleep(10)                                                   #  Condition A1 occured in 400 of 10000 checks. Timeout etc. try again
+              status = webpagestatus(WayLink[tag]["newiaurl"])
+              if(status != 1 && status != 3) {
+                if(Debug["network"]) print "Step A1: NOT FOUND. Page headers verified *not* 200"
+                sendlog(Project["bogusapi"], name, WayLink[tag]["newiaurl"] " A1")
+                fillway(tag, "0", "false", "none", "none")
+              }
+              if(status == 5) {
+                if(Debug["network"]) print "Step A1: 503 SERVERS DOWN."
+                sendlog(Project["critical"], name, " 503_servers_down A1")
+                return 0
+              }
             }
           }
           else {
@@ -267,7 +276,6 @@ function queryapiget(url, timestamp,        urlapi,j,tries,command,csv,c,b,csv2,
   # if(Debug["network"]) print "Command: " command
 
   while(j < tries) {
-    sleep(2)
     if(Debug["network"]) print "Starting API (get) (" j+1 ") for " urlapi
     csv = sys2var(command)
     c = qsplit(csv, b)
@@ -277,6 +285,7 @@ function queryapiget(url, timestamp,        urlapi,j,tries,command,csv,c,b,csv2,
     if(Debug["network"]) print "Ending API (get) (" length(csv) "/" c "|" length(csv2) "/" c2 ")"
     if(length(csv) == 0 || c == 0 || length(csv2) == 0 || c2 == 0) {                       # Problem retrieving API data, try again.
       j++
+      sleep(2)
     }
     else if(j == tries) {
       if(Debug["network"]) print "API time out (get)"
@@ -346,8 +355,6 @@ function webpagestatus(url, flag,    head,j,tries,command,response,wgetbody,wget
 
   while(j < tries) {
 
-    sleep(2)
-
     if(Debug["network"]) print "Starting headers (" j + 1 ") for " url
     if(Debug["wgetlog"]) wgethead = mktemp(Datadir "wgethead.XXXXXX", "f")
 
@@ -362,8 +369,10 @@ function webpagestatus(url, flag,    head,j,tries,command,response,wgetbody,wget
       close(wgethead)
     }
 
-    if(length(head) == 0 || responsecode ~ /none/)
+    if(length(head) == 0 || responsecode ~ /none/) {
       j++
+      sleep(2)
+    }
     else
       break
   }
@@ -455,7 +464,7 @@ function createpostdata(postfile,   tag,request) {
     if( WayLink[tag]["origdate"] !~ /none/ && WayLink[tag]["origencoded"] !~ /none/ ) 
       request = "url=" WayLink[tag]["origencoded"] "&closest=either&timestamp=" WayLink[tag]["origdate"] "&tag=" tag "&statuscodes=404&statuscodes=200&statuscodes=203&statuscodes=206"
     else 
-      request = "url=" WayLink[tag]["origencoded"] "&closest=after&timestamp=19000101&tag=" tag "&statuscodes=404&statuscodes=200&statuscodes=203&statuscodes=206"
+      request = "url=" WayLink[tag]["origencoded"] "&closest=after&timestamp=19700101&tag=" tag "&statuscodes=404&statuscodes=200&statuscodes=203&statuscodes=206"
 
     print request >> postfile
   }
@@ -496,7 +505,7 @@ function api(url,   tag) {
 #  url should be encoded before passing 
 #  Sample JSON data: wget -q -O- "http://timetravel.mementoweb.org/api/json/20130115102033/http://cnn.com" | jq '. [ ]'
 #
-function api_memento(url, date, tag,     snap,c,a,i,re,k,d,b,e,f,m,n,stamp,command) {
+function api_memento(url, date, tag,     snap,c,a,i,re,k,d,b,e,f,m,n,p,q,stamp,command) {
 
   command = Exe["wget"] Wget_opts "-q -O- \"http://timetravel.mementoweb.org/api/json/" date "/" url "\" | " Exe["jq"] " -r '. []'" 
   if(Debug["network"]) print command
@@ -511,6 +520,8 @@ function api_memento(url, date, tag,     snap,c,a,i,re,k,d,b,e,f,m,n,stamp,comma
     }
   }
 
+  print jsonin "\n----" >> Datadir "mementoapi.json"
+
   snap = "closest|prev|first"                          # Check in this order
   c = split(snap, a, "|")
   while(i++ < c) {
@@ -524,6 +535,13 @@ function api_memento(url, date, tag,     snap,c,a,i,re,k,d,b,e,f,m,n,stamp,comma
         while(f++ < d) {
           e[f] = strip(e[f])
           if( ! isarchiveorg(e[f]) && e[f] ~ /^http/ && e[f] !~ /archive[.]is\// )  { # Not archive.org or archive.is
+
+           # webcitation.org with a path < 9 characters is a broken URL
+            if(e[f] ~ /webcitation[.]org/) {
+              q = split(e[f], p, "/")
+              if(length(p[q]) < 5) 
+                break
+            }   
 
            # "datetime":"2000-06-20T18:02:59Z"
             match(strip(k[0]), /"datetime"[:][ ]{0,}"[^\"]*"/,m)
@@ -644,7 +662,7 @@ function getredirurl(origurl, filename,   k,a,b,body,path,origpath,url,newurl) {
 function iainfopage(body,  c,a,i,result) {
 
   result = 0
-  c = split(readfile(body), a, "\n")
+  c = split(bodylead(body), a, "\n")
   while(i++ < c) {
     if(a[i] ~ /Your use of the Wayback Machine is subject to the Internet Archive/)
       result = 1    
@@ -667,7 +685,7 @@ function iainfopage(body,  c,a,i,result) {
 function iaredirect(body,  c,a,i,result) {
 
   result = 0
-  c = split(readfile(body), a, "\n")
+  c = split(bodylead(body), a, "\n")
   while(i++ < c) {
     if(a[i] ~ /Got an HTTP 302 response at crawl time/)
       result = 1
@@ -683,7 +701,7 @@ function iaredirect(body,  c,a,i,result) {
 function pageerror(body,  c,a,i,result) {
 
   result = "none"
-  c = split(readfile(body), a, "\n")
+  c = split(bodylead(body), a, "\n")
   while(i++ < c) {
     if(a[i] ~ /The machine that serves this file is down/)                          # archive.org and archive.is
       result = "bummer"
@@ -699,6 +717,22 @@ function pageerror(body,  c,a,i,result) {
       result = "excluded"
   }
   return result
+}
+
+#
+# Return first X lines of wget body file .. presume interesting info there -- rest is content.
+#  prevent large files (mp4s etc) from killing swap 
+#
+function bodylead(bodypath,    s,i,out) {
+
+  while ((getline s < bodypath ) > 0) {
+    i++
+    out = out "\n" s
+    if(i > 1000)
+      break
+  }
+  close(bodypath)
+  return out
 }
 
 #
@@ -754,7 +788,7 @@ function fillway(tag, status, available, newiaurl, newurl) {
 
   if( WayLink[tag]["newiaurl"] !~ /none/)          # Security check
     if( ! isarchiveorg(WayLink[tag]["newiaurl"])) 
-      WayLink[tag]["newiaurl"] == "none"
+      WayLink[tag]["newiaurl"] = "none"
 }
 
 #

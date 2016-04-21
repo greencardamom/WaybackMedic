@@ -9,9 +9,10 @@ Instructions for installing WaybackMedic and configuring AWB
 
 2. The following programs are required:
 
-    Nim           Install development release instructions here: http://howistart.org/posts/nim/1
     GNU Awk 4.1+
     GNU Parallel 
+    jq 1.5+       (for JSON conversion - https://stedolan.github.io/jq/)
+    Python 3      (for url parsing/encoding)
     wdiff         (for colored inline diffs - apt-get install wdiff) (optional)
     
 2. Create two sub-directories "data" and "meta" (eg. mkdir data; mkdir meta)
@@ -22,6 +23,7 @@ Instructions for installing WaybackMedic and configuring AWB
     project.awk
     bug.awk
     driver.awk
+    medic.awk
 
     Set the above files to executable (eg. chmod 750 ucontribs.awk) 
     Set coldiff script executable
@@ -32,12 +34,10 @@ Instructions for installing WaybackMedic and configuring AWB
     ln -s project.awk project
     ln -s bug.awk bug
     ln -s driver.awk driver
+    ln -s medic.awk medic
 
 5. Edit init.awk and set paths to programs 
 
-6. Compile medic.nim
-
-	nim c medic.nim
 
 == Configure AWB ==
 

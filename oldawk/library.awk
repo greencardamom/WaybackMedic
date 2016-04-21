@@ -258,7 +258,7 @@ function stripwikimarkup(str) {
 #      "George Henry is a [[lawyer]] from [[Charlesville (Virginia)|Charlesville Virginia]]"
 #
 function stripwikicomments(str, a,c,i,out,sep) {
-  c =  patsplit(strip(str), a, /<![^>]*>/, sep)
+  c =  patsplit(strip(str), a, /<[ ]{0,}[!][^>]*>/, sep)
   out = sep[0]
   while(i++ < c) {
     out = out sep[i] 
@@ -342,6 +342,16 @@ function exists(name    ,fd) {
       return 0
     else
       return 1
+}
+
+#
+# File size
+#
+function filesize(name         ,fd) {
+    if ( stat(name, fd) == -1) 
+      return -1  # doesn't exist
+    else
+      return fd["size"]
 }
 
 #
@@ -492,7 +502,7 @@ function isarchiveorg(url,  safe) {
 function wayurlurl(url,  date,inx) {
 
    date = urltimestamp(url)
-   if(date && isanumber(date)) {
+   if(length(date) > 0) {
      inx = index(url, date) + length(date) + 1
      return removesection(url, 1, inx)
    }
@@ -514,7 +524,7 @@ function urltimestamp(url,  a,c,i,re) {
         i++
         return a[i]
       }
-      if(a[i] ~ /^[0-9]*$/) {
+      if(a[i] ~ /^[0-9?*]*$/) {
         return a[i]
       }
     }
@@ -528,14 +538,14 @@ function urltimestamp(url,  a,c,i,re) {
 #
 function replacetext(source, old, new, caller,    safe, a) {
 
+  if(length(source) == 0 || length(old) == 0) return source
+
   # Prevent errors in case "old" has more than 1 (or 0) match in "source"
   a = countsubstring(source, old)
   if(a > 1 || a < 1 ) {
     if(Debug["s"]) print "Abort. More than " a " copy(s) of string (" old ") in source: " new
     return source
   }
-
-  if(length(source) == 0 || length(old) == 0) return source
 
   if(Debug["s"]) print "\n\n____ENTERING REPLACE from " caller
   if(Debug["s"]) print "old: " old
@@ -1056,4 +1066,5 @@ function convertxml(str,   safe) {
       gsub(/&#039;/,"'",safe)
       return safe
 }
+
 
