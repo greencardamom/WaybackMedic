@@ -8,9 +8,10 @@ MIT License
 
 Source
 ========
+Nim 0.13.1
 GNU Awk 4.1
 
-The core functionality is medic.awk. 
+The core functionality is medic.nim. 
 
 driver.awk "drives" (executes) medic, which in turn is executed by GNU Parallel in batches
 
