@@ -62,6 +62,12 @@ proc japi2memlink(japi: string): bool =
   var date = ""
   var uri = ""
 
+  # Basic validations
+  if len(japi) == 0: 
+    return false
+  if japi[0] != '{' and japi[high(japi)] != '}':  
+    return false
+
   for d, m in json.pairs(  parseJson(japi)  ):
     if d == "mementos":
       for e, n in json.pairs(m):
@@ -126,7 +132,11 @@ proc japi2waylink(japi: string): int =
   
   var tag, count = 0
 
-  if len(japi) == 0: return 0
+  # Basic validations
+  if len(japi) == 0: 
+    return 0
+  if japi[0] != '{' and japi[high(japi)] != '}':  
+    return 0
 
   for d, m in pairs(parseJson(japi)):
     if d == "results":

@@ -58,9 +58,16 @@ BEGIN {
   }
 
 # Save wikisource
-  print http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", namewiki) "?action=raw") > wm_temp "article.txt"
+  print getwikisource(namewiki, "dontfollow") > wm_temp "article.txt"
   close(wm_temp "article.txt")
   stripfile(wm_temp "article.txt", "inplace")
+
+# Save wikisource (from old run)
+  #oldindex = "/home/adminuser/cbdb/meta/" pid "/index"
+#  oldindex = "/home/adminuser/wm/meta/" pid "/index"
+#  oldid = whatistempid(namewiki, oldindex)
+#  command = "cp " oldid "article.txt " wm_temp "article.txt"
+#  sys2var(command)
 
   command = "cp " wm_temp "article.txt " wm_temp "article.txt.2"
   sys2var(command)
@@ -88,7 +95,7 @@ BEGIN {
   safe = namewiki
   gsub(/["]/,"\\\"",safe)
 
-  command = Exe["medic"] " -p \"" Project["id"] "\" -n \"" safe "\" -s \"" wm_temp "\"article.txt"  
+  command = "./medic -p \"" Project["id"] "\" -n \"" safe "\" -s \"" wm_temp "\"article.txt -d n"  
   changes = sys2var(command)
   if(changes) {
     print "    Found " changes " change(s) for " namewiki > "/dev/stderr"
@@ -100,7 +107,6 @@ BEGIN {
     }
   }
 }
-
 
 function usage() {
 
@@ -115,5 +121,57 @@ function usage() {
   print "Example: "
   print "          driver -n \"Charles Dickens\" -p cb14feb16"
   print ""
+}
+
+
+#
+# Return the path/tempid of a name (eg. /home/adminuser/wi-awb/temp/wi-awb-0202173111/)
+#
+function whatistempid(name, filepath,      s, a, re) {
+
+  if(! checkexists(filepath) ) {
+    print "demon-lin.awk: Error unable to find " filepath ". " name 
+    return 0
+  }
+  re = "^" regesc2(strip(name)) "$"
+  while ((getline s < filepath ) > 0) {
+    split(s, a, "|")
+    if(strip(a[1]) ~ re) {          
+      close(filepath)
+      return strip(a[2])
+    }
+  }
+  close(filepath)
+  return 0
+}
+
+
+#
+# Get plain wikisource. Follow "#redirect [[new name]]"
+#
+# redir = "follow/dontfollow"
+#
+function getwikisource2(namewiki, redir,    f,ex,k,a) {
+
+  if(redir !~ /follow|dontfollow/)
+    redir = dontfollow
+
+# Save wikisource
+  f = http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", namewiki) "?action=raw")
+  if(length(f) < 1000) {
+    if(tolower(f) ~ "[#][ ]{0,}redirect[ ]{0,}[[]") {
+      if(redir ~ /dontfollow/) {
+        print namewiki >> wm_temp "redirect"     # Log redirect cases for later re-processing
+        close(wm_temp "redirect")
+        return ""
+      }
+      ex = http2var("https://en.wikipedia.org/wiki/Special:Export/" gensub(/[ ]/, "_", "g", namewiki))
+      match(ex,/<redirect title=\"[^\"]*\"/,k)
+      split(k[0],a,"\"")
+      f = http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", a[2]) "?action=raw")
+      return strip(f)
+    }
+  }
+  return strip(f)
 }
 

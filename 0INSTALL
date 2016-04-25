@@ -41,7 +41,7 @@ Instructions for installing WaybackMedic and configuring AWB
 
 == Configure AWB ==
 
-6. WaybackMedic uses AWB's Tools->External process feature. The external process will be GNU Awk.
+7. WaybackMedic uses AWB's Tools->External process feature. The external process will be GNU Awk.
 
    You have a choice which GNU Awk to run under Windows.
 
@@ -54,7 +54,7 @@ Instructions for installing WaybackMedic and configuring AWB
 
       Note: I have not tested with native windows binary - it may require changes to paths "/" vs "\" 
 
-7. AWB configuration (awb-settings.xml) for Cygwin would look something like this:
+8. AWB configuration (awb-settings.xml) for Cygwin would look something like this:
 
     <ExternalProgram>
       <Enabled>true</Enabled>
@@ -69,9 +69,9 @@ Instructions for installing WaybackMedic and configuring AWB
   It doesn't have to be an actual ramdisk, "c:\tmp\" will also work here, in init.awk it would be "/tmp/"
   Mindful of "/" and "\" in the above as they are a mix
 
-8. Edit demon-win.awk and change the paths in the 3 lines marked Configuration at the top
+9. Edit demon-win.awk and change the paths in the 3 lines marked Configuration at the top
 
-9. The purpose of the two demon-* scripts is explained here ("Method 2")
+10. The purpose of the two demon-* scripts is explained here ("Method 2")
 
      https://en.wikipedia.org/wiki/User:Green_Cardamom/awb/cygwin
 

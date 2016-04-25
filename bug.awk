@@ -35,8 +35,9 @@ BEGIN {
 
   type = "view"                    # Default
   difftype = "c"
+  capturetype = "a"
 
-  while ((C = getopt(ARGC, ARGV, "vrp:n:d:")) != -1) { 
+  while ((C = getopt(ARGC, ARGV, "vrp:n:d:c:")) != -1) { 
       opts++
       if(C == "p")                 #  -p <project>   Use project name. No default.
         pid = verifypid(Optarg)
@@ -52,6 +53,11 @@ BEGIN {
       if(C == "d") {               #  -d <type>      Diff. Type is "c" for color (default) or "p" for plain text
         difftype = verifyval(Optarg)
         type = "diff"
+      }
+
+      if(C == "c") {               #  -c <type>      Capture output to clipboard. "a" for article.txt and "w" for article.wayback.txt
+        type = "capture"
+        capturetype = verifyval(Optarg)
       }
 
       if(C == "h") {
@@ -93,6 +99,28 @@ BEGIN {
     exit
   }
 
+  if(type ~ /capture/) {
+    cap(name, capturetype)
+    exit
+  }
+
+}
+
+
+#
+# Send file to stdout for capture by clip
+#
+function cap(name, type,    command) {
+
+  getindex(name)
+
+  if(type ~ /^a$/) 
+    command = Exe["cat"] " \"" Inx["path"] "\"article.txt"
+  else if(type ~ /^w$/) 
+    command = Exe["cat"] " \"" Inx["path"] "\"article.waybackmedic.txt"
+
+  system(command)
+
 }
 
 function diff(name, type,   command) {
@@ -119,7 +147,7 @@ function run(name,   command) {
 #exit
 
   getindex(name)
-  command = Exe["medic"] " -p \"" Project["id"] "\" -n \"" name "\" -s \"" Inx["path"] "article.txt\""
+  command = "./medic -p \"" Project["id"] "\" -n \"" name "\" -s \"" Inx["path"] "article.txt\" -d n"
   system(command)
 
 }
@@ -130,7 +158,7 @@ function view(name) {
   print "Name: " Inx["name"]
   print "Meta: cd " Project["meta"]
   print "Data: cd " Inx["path"]
-  print "./medic -p \"" Project["id"] "\" -n \"" name "\" -s \"" Inx["path"] "article.txt\""
+  print "./medic -p \"" Project["id"] "\" -n \"" name "\" -s \"" Inx["path"] "article.txt\" -d y"
 
 }
 

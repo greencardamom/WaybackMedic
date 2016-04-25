@@ -296,6 +296,8 @@ function corruption(pid,did,mid,    data,meta,a,namewiki,command) {
 
 #
 # Assemble index from index.temp post-GNU parallel 
+#  Given an index and index.temp, this will merge into index leaving only uniq entries 
+#
 #
 function assemble(pid,did,mid,   data,meta) {
 
@@ -419,7 +421,7 @@ function check_fixspurone(pid, did, mid,    command,files,stampdir,c,i,re) {
 function check_string(filename, pid, did, mid,    re,c,files,stampdir,i,command,count) {
 
  # Be careful with escaping as unsure how grep responds 
-  re = "archiveurl=archive"
+  re = "[>][|]url[=]"
 
   files = sys2var(Exe["ls"] " " did pid "/")
 
@@ -436,7 +438,10 @@ function check_string(filename, pid, did, mid,    re,c,files,stampdir,i,command,
       command = Exe["grep"] " -ciE \"" re "\" " did pid "/" stampdir[i] "/" filename
       count = sys2var(command)
       if(count > 0) {
-        print whatisindexname(did pid "/" stampdir[i], mid pid "/index") " ( cd " did pid "/" stampdir[i] " )"
+        newid = whatisindexname(did pid "/" stampdir[i], mid pid "/index")
+        if(newid !~ /^0$/)
+          print newid
+#        print newid " ( cd " did pid "/" stampdir[i] " )"
       }
     }
   }

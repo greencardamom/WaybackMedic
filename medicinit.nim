@@ -103,7 +103,7 @@ GX.home = "/home/adminuser/wmnim/"
 GX.agent = "http://en.wikipedia.org/wiki/User:Green_Cardamom/WaybackMedic (" & CL.name & ")"
 
 # Default wget options (include lead/trail spaces)
-GX.wgetopts = " --no-cookies --ignore-length --user-agent=\"" & GX.agent & "\" --no-check-certificate --tries=5 --timeout=120 --waitretry=60 --retry-connrefused "
+GX.wgetopts = " --no-cookies --ignore-length --user-agent=\"" & GX.agent & "\" --no-check-certificate --tries=2 --timeout=110 --waitretry=10 --retry-connrefused "
 
 GX.datetype = "mdy"
 GX.id = -1

@@ -199,6 +199,9 @@ proc timestamp2date(dateinput: string): string =
 
   if dateinput !~ "^[0-9]{8}$":
     return dateinput
+  var parseddate = parse(dateinput, "yyyyMMdd") # Check for invalid data 
+  if $parseddate ~ "[?][?][?]":
+    return dateinput
 
   var newdate = ""
 
@@ -206,6 +209,7 @@ proc timestamp2date(dateinput: string): string =
     newdate = format(parse(dateinput, "yyyyMMdd"), "d MMMM yyyy")
   else:
     newdate = format(parse(dateinput, "yyyyMMdd"), "MMMM d, yyyy")
+
   if newdate.len > 0:
     return newdate
   else:
@@ -223,12 +227,23 @@ proc urldate(url, curdate: string): string =
   var dateinput = ""
   var re = "^web$"
 
+  if curdate == nil: 
+    var curdate = ""
+  if url == nil: 
+    return curdate
+
   var c = splitawk(url, a, "/")   
   for i in 0..c - 1:
     if a[i] ~ re and i != c - 1:
+
       dateinput = substr(a[i+1], 0, 3) & substr(a[i+1], 4, 5) & substr(a[i+1], 6, 7)
+
       if dateinput !~ "^[0-9]{8}$":
         return curdate
+      var parseddate = parse(dateinput, "yyyyMMdd") # Check for invalid date
+      if $parseddate ~ "[?][?][?]":
+        return curdate
+
       if GX.datetype == "dmy":
         var newdate = format(parse(dateinput, "yyyyMMdd"), "d MMMM yyyy")
         if newdate.len > 0:

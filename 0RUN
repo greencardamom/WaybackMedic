@@ -1,7 +1,7 @@
 ==Instructions==
 
 1. Make a list of uniq articles touched by a user across a date range and save to a ".auth" file
-   in the meta directory.
+   in the meta directory. eg:
    
     ./ucon -n "Cyberbot II" -s "20151231" -e "20160304" > meta/cb20151231-20160304.auth
 
@@ -20,18 +20,18 @@ ________________________________________________________________________________
 
     ./project -c -p cb20151231-20160304.0001-1000
 
-  The "-p" defines a new project name. In this case we are using the name created above, allong with
-  an extension ".0001-1000" -- this means the project will process the first 1000 articles. 
+  The "-p" defines a new project name. In this case we are using the name created above, along with
+  an extension ".0001-1000" -- this means the project is for the first 1000 articles. 
 
 2. Run medic in parallel                 
 
      parallel -a meta/cb20151231-20160304.0001-1000/auth -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.0001-1000 -n {}
 
    Here we are running GNU Parallel to process the 1000 names of the project id cb20151231-20160304.0001-1000
-   "-j 2" tells how many processes to run at one time. Recommend 2 to 3. 
+   "-j 2" tells how many processes to run at one time. My 4-CPU i7 can handle 20 for example. 
    Cut and paste the above line, replace "cb20151231-20160304.0001-1000" with your project name.
 
-2.1 Create index file
+2.1 Create the index file
 
    ./project -j -p cb20151231-20160304.0001-1000
    mv meta/cb20151231-20160304.0001-1000/index.temp meta/cb20151231-20160304.0001-1000/index.temp.old

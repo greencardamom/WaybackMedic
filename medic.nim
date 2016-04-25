@@ -231,9 +231,11 @@ proc fixbadstatus(ttl: string, fr: varargs[string]): string =
             return tl
       elif newurl != "none" and not isarchiveorg(newurl):                     # Change to alt archive
         newdate = altarchfield(newurl, "altarchdate")
-        olddate = getargarchive(tl, "date", "clean")
+        var olddateclean = getargarchive(tl, "date", "clean")
+        olddate = getargarchive(tl, "date")
+        newdate = replacetext(olddate, olddateclean, timestamp2date(newdate), "fixbadstatuscite4.1")
         tl = replacetext(tl, urlarch, newurl, "fixbadstatuscite3")
-        tl = replacetext(tl, olddate, timestamp2date(newdate), "fixbadstatuscite4")
+        tl = replacetext(tl, olddate, newdate, "fixbadstatuscite4")
         inc(GX.changes)
         sendlog(Project.log404, CL.name, "cite-modifyaltarch")
         sendlog(Project.newaltarch, CL.name, getargurl(tl) & " " & urltimestamp(urlarch) & " " & newurl & " " & newdate)

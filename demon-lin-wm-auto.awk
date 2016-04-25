@@ -23,12 +23,12 @@
 # THE SOFTWARE.
 
 
-# "Auto" if you plan to update via AWB, manually or automatic
-#   The assumption is you have already run and processed the data via ./project
-
 # Demon to pass data back and forth between Windows host and Linux guest OS under VirtualBox
 # See also demon-win.awk for the version running on the Windows host.
 # Purposes is to run AWB on windows, and unix scripts on Linux. 
+
+# This is the "Auto" version if you plan to update via AWB, manually or automatic
+#   The assumption is you have already run and processed the data via ./project
 
 @include "init.awk"
 @include "library.awk"
@@ -91,7 +91,7 @@ function main(    name,tempid,article,command) {
           }         
           else {
             if(checkexists(tempid "article.waybackmedic.txt"))  {  # Skip if no changes were made.
-              newarticle = strip(http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", name) "?action=raw"))
+              newarticle = getwikisource(name, "dontfollow")
               article = strip(readfile(tempid "article.txt"))
               if(length(newarticle) == 0 || length(article) == 0) {
                 abort("demon-lin.awk: Error unable to retrieve wikisource or article.txt. " name)
@@ -108,7 +108,7 @@ function main(    name,tempid,article,command) {
                     removefile(tempid "article.waybackmedic.txt")                    
                   command = Exe["bug"] " -n \"" name "\" -p \"" Project["id"] "\" -r"
                   system(command)
-                  tempid = whatistempid(name, Project["index"] )  # tempid shouldn't change 
+                  tempid = whatistempid(name, Project["index"] )
                   prnt("               new ID: " tempid)
                   article = readfile(tempid "article.txt")
                   if(length(article) == 0) 

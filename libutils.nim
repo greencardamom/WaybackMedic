@@ -233,7 +233,7 @@ proc replacetext*(source, old, new, caller: string): string =
       echo "|" & old & "| is " & $old.len & " chars long."
       var msg = "Replacetext(2): Aborted: found " & intToStr(c) & " copy(s) of string (" & old & ") in source"
       msg >* "/dev/stderr"
-    return old
+    return source
 
   var safe = source
   var inx = index(safe, old)
