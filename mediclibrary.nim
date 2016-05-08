@@ -59,7 +59,7 @@ proc todaysdate(): string =
 #
 proc setdatetype() =
 
-  var articlec = splitawk(GX.article, articles, "\n")
+  var articlec = awk.split(GX.article, articles, "\n")
 
   for i in 0..articlec - 1:
     if articles[i] ~ "[{]{0,}[{][ ]{0,}[Uu]se [Dd][Mm][Yy] [Dd]ates":
@@ -232,7 +232,7 @@ proc urldate(url, curdate: string): string =
   if url == nil: 
     return curdate
 
-  var c = splitawk(url, a, "/")   
+  var c = awk.split(url, a, "/")   
   for i in 0..c - 1:
     if a[i] ~ re and i != c - 1:
 
@@ -332,7 +332,7 @@ proc getargarchive*(tl, arg: string, mag: varargs [string]): string =
   if match(tl, re, k) > 0:            # right side of = is blank
     if magic == "clean":
       return ""
-    s = substrawk(strip(k), 0, len(strip(k)) - 1)
+    s = awk.substr(strip(k), 0, len(strip(k)) - 1)
 
     if debug: "s = " & s >* "/dev/stderr"
 
@@ -388,7 +388,7 @@ proc cbignore*(s: string): bool =
 #  Pass copy of the article you want to check (such as ArticleWork)
 #
 proc cbignorebareline*(article, lk: string): bool =
-  var c = splitawk(article, a, "\n")
+  var c = awk.split(article, a, "\n")
   for i in 0..c - 1:
     if countsubstring(a[i], lk) > 0:
       if tolower(a[i]) ~ "cbignore":
@@ -401,7 +401,7 @@ proc cbignorebareline*(article, lk: string): bool =
 #  Pass copy of the article you want to check (such as ArticleWork)
 #
 proc deadlinkbareline*(article, lk: string): bool =
-  var c = splitawk(article, a, "\n")
+  var c = awk.split(article, a, "\n")
   for i in 0..c - 1:
     if countsubstring(a[i], lk) > 0:
       if tolower(a[i]) ~ "{{[ ]{0,}[Dd]ead link[ ]{0,}":
@@ -414,10 +414,10 @@ proc deadlinkbareline*(article, lk: string): bool =
 #
 proc bundled*(s: string): int =
 
-  var c = splitawk(s, a, "archive[-]{0,1}url[ ]{0,}=")
+  var c = awk.split(s, a, "archive[-]{0,1}url[ ]{0,}=")
   if c > 2: 
     return 2
-  var d = splitawk(s, a, "[Ww]ayback[ ]{0,}[|]")
+  var d = awk.split(s, a, "[Ww]ayback[ ]{0,}[|]")
   if d > 2: 
     return 3
 
@@ -433,7 +433,7 @@ proc bundled*(s: string): int =
 #
 proc urltimestamp*(url: string): string =
   
-  var c = splitawk(url, a, "/")
+  var c = awk.split(url, a, "/")
   for i in 0..c - 1:
     if a[i].len > 0:
       if a[i] ~ "^web$":
@@ -527,12 +527,13 @@ proc formatediaurl*(tl, cat: string): string =
     if tl ~ "^https[:]//web.archive.org/[0-9]{1,14}/":      # Insert /web/ into path if not already
       var a, c = ""
       match(tl, "^https[:]//web.archive.org/[0-9]{1,14}/", a)
-      splitawk(a, b, "/")
-      c = "https://web.archive.org/web/" & b[3] & "/"
-      gsub(a, c, tl)
+      if awk.split(a, b, "/") > 0:
+        c = "https://web.archive.org/web/" & b[3] & "/"
+        gsub(a, c, tl)
+
     return strip(tl)
 
-  return ""
+  return strip(tl)
 
 #
 # Format a non-IA URL into a regular format
@@ -568,18 +569,18 @@ proc replacefullref*(fullref, old, new, caller: string): string =
  # Remove {{dead link}} .. but only if one in ref, and one in new text
   re1 = "[{][ ]{0,}[{][ ]{0,}[Dd]ead[ ]{0,}[Ll]ink"
   re2 = re1 & "[^}]*[}][ ]{0,}[}]"
-  c = splitawk(new, a, re1)                
+  c = awk.split(new, a, re1)                
   if c == 2:
-    c = splitawk(fullref, a, re1)
+    c = awk.split(fullref, a, re1)
     if c == 2:
       sub(re2,"",fullref)
 
  # Remove {{cbignore}} .. but only if one in ref, and one in new text
   re1 = "[{][ ]{0,}[{][ ]{0,}[Cc][Bb][Ii][Gg][Nn][Oo][Rr][Ee]"
   re2 = re1 & "[^}]*[}][ ]{0,}[}]"
-  c = splitawk(new, a, re1)
+  c = awk.split(new, a, re1)
   if c == 2:
-    c = splitawk(fullref, a, re1)
+    c = awk.split(fullref, a, re1)
     if c == 2:
       sub(re2,"",fullref)
 

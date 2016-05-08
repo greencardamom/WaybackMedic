@@ -874,6 +874,19 @@ function uriparseEncodeurl(str,   safe,command) {
   return sys2var(command)
 }
 
+
+#          
+# url-encode via Python (slow)
+#  Credit: https://askubuntu.com/questions/53770/how-can-i-encode-and-decode-percent-encoded-strings-on-the-command-line
+#     See for other options          
+#   
+function urlencodepython(str,   command) {
+
+   # python -c "import urllib, sys; print urllib.quote(sys.argv[1])" "Emil Młynarski"
+   command = Exe["python"] " -c \"import urllib, sys; print urllib.quote(sys.argv[1])\" \"" str "\""
+   return strip(sys2var(command))
+}                      
+
 #
 # url-decode via Python 
 #
@@ -1068,29 +1081,43 @@ function convertxml(str,   safe) {
 }
 
 
+
 #
 # Get plain wikisource. Follow "#redirect [[new name]]"
 #       
 # redir = "follow/dontfollow" 
 #
-function getwikisource(namewiki, redir,    f,ex,k,a) {
+function getwikisource(namewiki, redir,    f,ex,k,a,command,urlencoded,r) {
 
-  if(redir !~ /follow|dontfollow/) 
-    redir = dontfollow
+  if(redir !~ /follow|dontfollow/)
+    redir = dontfollow       
 
-# Save wikisource
-  f = http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", namewiki) "?action=raw")
-  if(length(f) < 1000) {      
+  urlencoded = urlencodepython(strip(namewiki))
+  command = "https://en.wikipedia.org/wiki/" urlencoded "?action=raw"
+  f = http2var(command)
+
+  if(length(f) < 1000) {
     if(tolower(f) ~ "[#][ ]{0,}redirect[ ]{0,}[[]") {
-      if(redir ~ /dontfollow/)
+      print "Found a redirect:"
+      match(f, "[#][ ]{0,}[Rr][Ee][^]]*[]]", r)
+      print r[0]
+      if(redir ~ /dontfollow/) 
         return ""
-      ex = http2var("https://en.wikipedia.org/wiki/Special:Export/" gensub(/[ ]/, "_", "g", namewiki))
+      ex = http2var("https://en.wikipedia.org/wiki/Special:Export/" urlencoded)
       match(ex,/<redirect title=\"[^\"]*\"/,k)
-      split(k[0],a,"\"")
-      f = http2var("https://en.wikipedia.org/wiki/" gensub(/[ ]/, "_", "g", a[2]) "?action=raw")
-      return strip(f)
+      if( length(k[0]) > 0) {
+        split(k[0],a,"\"")
+        if( length(a[2]) > 0) {
+          f = http2var("https://en.wikipedia.org/wiki/" urlencoded "?action=raw")
+          return strip(f)
+        }
+        else
+          return ""
+      }
+      else
+        return ""
     }
-  }                
+  }
   return strip(f)
 }
 

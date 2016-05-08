@@ -1,9 +1,5 @@
 import strutils, nre, options
 
-#
-# Functions to mirror some awk stdlib in nim
-#
-
 discard """ 
 
 The MIT License (MIT)
@@ -39,17 +35,15 @@ THE SOFTWARE."""
 #
 #  . Return number of characters from start of string the match starts, beginning with 1 (not zero). 
 #  . Return 0 if no match
-#  . A 'dest' string must be defined prior to calling. It will be overwritten.
-#  . Use index() instead if 'pattern' is not a regex and not using 'dest'
+#  . An optional 'dest' string is created and filled with the results of the match. If already defined it's contents overwritten.
+#  . Consider using index() instead if 'pattern' is not a regex and not using 'dest'
 #
 #  Example:
-#    var a = ""
-#    if match("this is a test a", "s.*?a", a) > 0:
+#    import awk
+#    if awk.match("this is a test a", "s.*?a", a) > 0:
 #      echo a #=> "s is a"
 #
-
-#
-# Use index() if pattern is not a regex
+#  'a' did not need to be defined.
 #
 proc match*(source: string, pattern: string): int =
     if source.len < 1 and pattern.len < 1:
@@ -58,7 +52,6 @@ proc match*(source: string, pattern: string): int =
       return 0
 
     var found = nre.find(source,re("(?s)" & pattern))  
-
     if found.isSome:                            
       var j: Slice[int]
       j = found.get.captureBounds[-1].get                            
@@ -66,6 +59,36 @@ proc match*(source: string, pattern: string): int =
     else:
       return 0
 
+proc makeDiscardable[T](a: T): T {.discardable.} = a
+
+template match*(source, pattern: string, dest: untyped): int =   
+
+    if source.len < 1 and pattern.len < 1:
+      makeDiscardable(1)
+    if source.len < 1 or pattern.len < 1:
+      makeDiscardable(0)
+
+    when compiles(dest):
+      dest = ""
+    else:
+      var dest = ""
+
+    var found = nre.find(source,re("(?s)" & pattern))
+    if isSome(found):
+      dest = $get(found) 
+      var loc = index(source, dest)
+      if loc < 0:
+        makeDiscardable(0)
+      else:    
+        makeDiscardable(loc + 1)
+    else:                 
+      makeDiscardable(0)
+
+
+#
+# Old code
+#
+discard """
 proc match*(source: string, pattern: string, dest: var string): int {.discardable.} =
     if source.len < 1 and pattern.len < 1:
       return 1   
@@ -80,33 +103,7 @@ proc match*(source: string, pattern: string, dest: var string): int {.discardabl
       return j.a + 1
     else:
       return 0
-
-proc makeDiscardable[T](a: T): T {.discardable, inline.} = a
-
-template matchalt*(source, pattern: string, dest: untyped): int =   
-
-    if source.len < 1 and pattern.len < 1:
-      makeDiscardable(1)
-    if source.len < 1 or pattern.len < 1:
-      makeDiscardable(0)
-
-    when declaredInScope(dest):
-      dest = ""
-    else:
-      var dest = ""
-
-    var found = nre.find(source,re("(?s)" & pattern))
-    if found.isSome:
-      var j: Slice[int]
-      j = found.get.captureBounds[-1].get
-      when declaredInScope(dest):
-        dest = found.get.captures[-1]
-        makeDiscardable(j.a + 1)
-      else:
-        dest = found.get.captures[-1]
-        makeDiscardable(j.a + 1)
-    else:
-      makeDiscardable(0)
+"""
 
 #
 #   ~ and !~ 
@@ -187,14 +184,23 @@ proc `>>`*(text, filename: string): bool {.discardable.} =
 #      named "splitawk" to avoid accidental conflation between awknim.split() / system.split()
 #      You can optionally rename it split() and deploy it as awknim.split()
 #
-template splitawk*(source: string, dest: untyped, match: string): int =
-  when declaredInScope(dest):
+template split*(source: string, dest: untyped, match: string): int =
+
+  when compiles(dest):
     dest = nre.split(source, re("(?s)" & match))
   else:
     var dest = nre.split(source, re("(?s)" & match))
-  makeDiscardable(dest.len)
 
+  if dest[0] == source:  # no match
+    delete(dest, 0)
+    makeDiscardable(0)
+  else:
+    makeDiscardable(dest.len)
 
+#
+# Old code
+#
+discard """
 #
 # Splitalt
 #
@@ -216,6 +222,7 @@ proc splitawkalt*(source: string, dest: var seq[string], match: string): int {.d
   dest = split(source, re("(?s)" & match))
   result = len(dest)
 
+"""
 
 #
 # Gsub
@@ -417,7 +424,7 @@ proc sub*(pattern, replacement, source: string, occurance: int): string {.discar
 #
 #  index(source [string], target [string])
 #
-# Return 0-oriented start location (index) of first occurance of non-regex 'target' in 'string'
+# Return 0-oriented start location (index) of first occurance of non-regex 'target' in 'source'
 #
 #    . if none found or error return -1
 #
@@ -435,21 +442,20 @@ proc index*(source, target: string): int =
 #
 # Substr
 #
-#   substrawk(source [string], start [int])
-#   substrawk(source [string], start [int], length[int])
+#   substr(source [string], start [int])
+#   substr(source [string], start [int], length[int])
 #
-# Return 'length'-charater long substring of 'source' starting at char number 'start'
+# Return 'length'-character long substring of 'source' starting at char number 'start'
 #
-#   . Because Nim's system.substr() has the same order and type of arguments this proc is 
-#      named "substrawk" to avoid accidental conflation between awknim.substr() / system.substr()
 #   . The first character is 0 (diff from awk which is 1)
-#   . If 'length' not present return the string from 'start' to end
+#   . If 'length' not present return the string from 'start' to end of source.
 #   . If 'start' < 0, treat as 0
 #   . If 'start' > length of source, return ""
 #   . If 'length' < 1, return ""
+#   . Because nim's system.substr() has the same order and type of arguments this proc should be invoked as awk.substr() to avoid ambiguity.
 #
 #
-proc substrawk*(source: string, a: varargs[int]): string =
+proc substr*(source: string, a: varargs[int]): string =
 
   var length, start = -1
   var alen = a.len
@@ -458,7 +464,7 @@ proc substrawk*(source: string, a: varargs[int]): string =
     return ""
   elif alen == 1:
     start = a[0]
-    length = alen
+    length = source.len
   elif alen == 2:
     start = a[0]
     length = a[1]

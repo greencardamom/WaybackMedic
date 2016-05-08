@@ -116,7 +116,7 @@ GX.article = readfile(CL.sourcefile)
 GX.articlework = GX.article
 
 GX.datadir = dirname(CL.sourcefile)
-GX.cx = splitawk(GX.datadir, GXax, "/")
+GX.cx = awk.split(GX.datadir, GXax, "/")
 GX.wid = GXax[GX.cx - 2]
 "" >* "/tmp/" & GX.wid                                 # Directory ID for tracking running/stuck process
 
@@ -314,7 +314,7 @@ Documentation for Wayback Medic project """ & Project.id & """
 """
     docs >* Project.docfixes
 
-    let c = splitawk(readfile(GX.home & "medic.nim"), a, "\n")
+    let c = awk.split(readfile(GX.home & "medic.nim"), a, "\n")
     for i in 0..c - 1:
       if a[i] ~ "[(]Rev[:][ ][A-Z]":
         " " & a[i]  >> Project.docfixes
@@ -326,16 +326,20 @@ Documentation for Wayback Medic project """ & Project.id & """
 proc setup(pid: string): bool {.discardable.} =
 
   if existsFile(GX.home & "project.cfg"):
-    var c = splitawk(readfile(GX.home & "project.cfg"), a, "\n")
+    var c = awk.split(readfile(GX.home & "project.cfg"), a, "\n")
     for i in 0..c - 1:
       if a[i] == "" or substr(a[i],0,1) == "#":    # ignore lines starting with #
         continue
       if a[i] ~ ("^" & pid & "[.]data"):
-        splitawk(a[i],b,"=")
-        Project.data = strip(b[1])
+        if awk.split(a[i],b,"=") > 0:
+          Project.data = strip(b[1])
+        else:
+          Project.data = a[i]
       if a[i] ~ ("^" & pid & "[.]meta"):
-        splitawk(a[i],b,"=")
-        Project.meta = strip(b[1])
+        if awk.split(a[i],b,"=") > 0:
+          Project.meta = strip(b[1])
+        else:
+          Project.meta = a[i]
   else:
     "Unable to find " & GX.home & "project.cfg" >* "/dev/stderr"
     quit(QuitFailure)

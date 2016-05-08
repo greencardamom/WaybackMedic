@@ -216,14 +216,14 @@ proc api_memento(url, date: string, tag: int): string =
 
     for i in split(snap):
       raw = fieldvalMO(MemLink, strip(i))
-      if splitawk(raw, a, "[ ][|][ ]") == 2:
+      if awk.split(raw, a, "[ ][|][ ]") == 2:
         muri = strip(a[0])
         mdate = strip(a[1])
         if not isarchiveorg(muri) and muri ~ "^http" and muri !~ "archive[.]is/":
           
          # webcitation.org with a path < 5 characters is a broken URL
          if muri ~ "webcitation[.]org":
-           q = splitawk(muri, p, "/")
+           q = awk.split(muri, p, "/")
            if len(p[q - 1]) < 5:
              break
 
@@ -259,18 +259,18 @@ proc createpostdata(postfile: string): bool {.discardable.} =
 proc createemptyjson(postfile: string): string =
 
   var s, ts = ""
-  splitawk(readfile(postfile), sa, "\n")
+  awk.split(readfile(postfile), sa, "\n")
 
   s = "{\"results\": ["
 
   for i in 0..high(sa):
     match(sa[i], "&timestamp[=][0-9]{1,14}", ts)
     gsub("url[=]", "", sa[i])
-    splitawk(sa[i], sc, "&")
-    if sc[0] ~ "^http":
-      s = s & "{\"url\": \"" & urldecode(sc[0]) & "\", \"timestamp\": \"" & ts & "\", \"archived_snapshots\": {}, \"tag\": \"" & $i & "\"}"
-      if i != high(sa) - 1:
-        s = s & ", "
+    if awk.split(sa[i], sc, "&") > 0:
+      if sc[0] ~ "^http":
+        s = s & "{\"url\": \"" & urldecode(sc[0]) & "\", \"timestamp\": \"" & ts & "\", \"archived_snapshots\": {}, \"tag\": \"" & $i & "\"}"
+        if i != high(sa) - 1:
+          s = s & ", "
 
   s = s & "]}"
   return s
@@ -298,13 +298,13 @@ proc headerresponse(head: string): int =
   var cache = newSeq[int](0)
   var c, d, le: int
 
-  c = splitawk(head, a, "\n")
+  c = awk.split(head, a, "\n")
   for i in 0..c - 1:
     if a[i] ~ "^[ ]{0,5}[Hh][Tt][Tt][Pp]/1[.]1": 
-      splitawk(a[i], b, " ")
-      d = parseInt(strip(b[3])) 
-      if d > 1:               
-        cache.add(d)         
+      if awk.split(a[i], b, " ") > 0:
+        d = parseInt(strip(b[3])) 
+        if d > 1:               
+          cache.add(d)         
  
   le = len(cache) 
   if le > 0: 
@@ -345,7 +345,7 @@ proc pageerror(body: string): string =
   var c: int
   var status = "none"
 
-  c = splitawk(bodylead(body), a, "\n")
+  c = awk.split(bodylead(body), a, "\n")
   for i in 0..c - 1:
     if a[i] ~ "The machine that serves this file is down":                          # archive.org and archive.is
       status = "bummer" 
@@ -373,7 +373,7 @@ proc iainfopage(body: string): bool =
   var c: int
   var status = false
   
-  c = splitawk(bodylead(body), a, "\n")
+  c = awk.split(bodylead(body), a, "\n")
   for i in 0..c - 1:
     if a[i] ~ "Your use of the Wayback Machine is subject to the Internet Archive":
       status = true
@@ -396,7 +396,7 @@ proc iaredirect(body: string): bool =
   var c: int
   var status = false
 
-  c = splitawk(bodylead(body), a, "\n")
+  c = awk.split(bodylead(body), a, "\n")
   for i in 0..c - 1:
     if a[i] ~ "Got an HTTP 302 response at crawl time":
       status = true
@@ -424,14 +424,14 @@ proc getredirurl(origurl, filename: string): string =
   # <p class="impatient"><a href="/web/20090205165059/http://news.bbc.co.uk/sport2/hi/cricket/7485935.stm">
 
   if match(body,"[<][ ]{0,}[Pp][ ]{1,}[Cc][Ll][Aa][Ss]{2}[ ]{0,}[=][ ]{0,}\"[ ]{0,}[Ii]mpatient[ ]{0,}\"[ ]{0,}>[ ]{0,}[<][ ]{0,}[Aa][ ]{1,}[Hh][Rr][Ee][Ff][ ]{0,}[=][ ]{0,}\"[^\"]*\"", k) > 0:
-    if splitawk(k, a, "\"") == 5:                
+    if awk.split(k, a, "\"") == 5:                
       url = strip(a[3])
 
   # Method 2      
   # function go() { document.location.href = "\/web\/20090205165059\/http:\/\/news.bbc.co.uk\/sport2\/hi\/cricket\/7485935.stm"
 
   if len(url) == 0 and match(body, "function[ ]{1,}go[(][)][ ]{0,}[{][ ]{0,}document[.]location[.]href[ ]{0,}[=][ ]{0,}\"[^\"]*\"", k) > 0:
-     if splitawk(k, a, "\"") == 3:
+     if awk.split(k, a, "\"") == 3:
        gsub("\\/","/",a[1])
        url = strip(a[1])
 
@@ -457,7 +457,7 @@ proc getredirurl(origurl, filename: string): string =
     if newurl[high(newurl)] == '/' and url[high(url)] != '/':                    # If last char of new URL is /
       if Debug.network: "Redir URL failed check 4" >* "/dev/stderr"
       return ""
-    if splitawk(path, a, "/") == 2 and splitawk(origpath, a, "/") > 2:
+    if awk.split(path, a, "/") == 2 and awk.split(origpath, a, "/") > 2:
       if Debug.network: "Redir URL failed check 5: path is too short" >* "/dev/stderr"
       return ""
 

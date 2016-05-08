@@ -1,5 +1,12 @@
-Version
+WaybackMedic history
 
-0.01  10 Mar 2016    Initial version. 
+0.01  10 Mar 2016    Initial version in 100% GNU awk
 0.02  20 Mar 2016    Major re-write and bug fixes. 
-0.03  29 Mar 2016    Fixes/updates.
+0.03  29 Mar 2016    Minor fixes/updates
+
+---- restart ----
+
+0.01  21 Apr 2016    Conversion from Awk to Nim. Most of the primary code converted to Nim. Some awk command-line utilities retained as awk.
+                     Old awk version in "oldawk" directory.
+0.02  24 Apr 2016    Minor fixes/updates
+0.03  07 May 2016    Minor fixes/updates

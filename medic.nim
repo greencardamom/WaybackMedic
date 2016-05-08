@@ -1,4 +1,4 @@
-import awknim, libutils, strutils, times, json, osproc, os, docopt
+import awk, libutils, strutils, times, json, osproc, os, docopt
 from math import randomize, random
 include medicinit
 include mediclibrary
@@ -60,7 +60,7 @@ proc fixtrailingchar(tl: string): string =
   if datatype(tl,"wayback"):
     url = getargurl(tl)
     url2 = url
-    if substrawk(url, high(url), 1) ~ "[,]|[.]|[:]":
+    if awk.substr(url, high(url), 1) ~ "[,]|[.]|[:]":
       tl = replacetext(tl, url, gsub("[,]$|[.]$|[:]$", "", url2), "fixtrailing1")
       inc(GX.changes)
       sendlog(Project.logtrail, CL.name, "wayback1")
@@ -428,7 +428,7 @@ proc process_article(action, target: string) =
 
     if Proc.citeinsidec == -1:
       Proc.citeinsideb = newSeq[string](0)
-      Proc.citeinsidec = splitawkalt(GX.articlework, Proc.citeinsideb, "<ref[^>]*>")
+      Proc.citeinsidec = awk.split(GX.articlework, Proc.citeinsideb, "<ref[^>]*>")
 
     if Proc.citeinsidec > 1:
       for i in 0..Proc.citeinsidec - 1:
@@ -513,9 +513,8 @@ proc process_article(action, target: string) =
       Proc.articlenorefb = newSeq[string](0)
       Proc.articlenoref = GX.articlework
       gsub("<ref[^>]*/[ ]{0,}>", "", Proc.articlenoref)                                               # remove <ref name=string />    
-      Proc.articlenorefc = splitawkalt(Proc.articlenoref, Proc.articlenorefb, "<ref[^>]*>")           # remove <ref></ref>
+      Proc.articlenorefc = awk.split(Proc.articlenoref, Proc.articlenorefb, "<ref[^>]*>")           # remove <ref></ref>
       for i in 1..Proc.articlenorefc - 1:
-        #Proc.articlenoref = replacetext(Proc.articlenoref, substrawk(Proc.articlenorefb[i], 0, index(Proc.articlenorefb[i], "</ref>") ), "", "processoutside1")
         Proc.articlenoref = replace(Proc.articlenoref, substr(Proc.articlenorefb[i], 0, index(Proc.articlenorefb[i], "</ref>") ), "")
 
    # Cite templates outside ref pairs
@@ -523,7 +522,7 @@ proc process_article(action, target: string) =
 
       if Proc.citeoutsidec == -1: 
         Proc.citeoutsideb = newSeq[string](0)
-        Proc.citeoutsidec = splitawkalt(Proc.articlenoref, Proc.citeoutsideb, "[{][{]")
+        Proc.citeoutsidec = awk.split(Proc.articlenoref, Proc.citeoutsideb, "[{][{]")
 
       if Proc.citeoutsidec > 1:
 
@@ -575,8 +574,8 @@ proc process_article(action, target: string) =
           if Proc.bareoutsideb[i] == "" or Proc.bareoutsideb[i] == nil: continue
 
           tl = strip(substr(Proc.bareoutsideb[i], 1, high(Proc.bareoutsideb[i]) - 1) )  # Remove "[]"
-          splitawk(tl, a, " ")  # Remove extlnk description string
-          tl = a[0]
+          if awk.split(tl, a, " ") > 0:  # Remove extlnk description string
+            tl = a[0]
           orig = tl
 
           if tl ~ "^http" and tl !~ "[ ]" and len(tl) > 24 and not cbignorebareline(GX.articlework, tl) and isarchiveorg(tl):
