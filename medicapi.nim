@@ -39,7 +39,7 @@ proc api(url: string): string =
         elif isarchiveorg(WayLink[tag].formated) and WayLink[tag].available == "wayback":
           return WayLink[tag].formated
         elif WayLink[tag].available == "altarch":
-          return WayLink[tag].altarch
+          return WayLink[tag].altarchencoded
         else:
           return "none"
       else:
@@ -169,6 +169,12 @@ proc japi2waylink(japi: string): int =
 proc japi2singleurl(japi: string): string =
 
   var val = ""
+
+  # Basic validations
+  if len(japi) == 0:
+    return "none"
+  if japi[0] != '{' and japi[high(japi)] != '}':
+    return "none"          
 
   for d, m in pairs(parseJson(japi)):
     if d == "results":
@@ -477,7 +483,8 @@ proc webpagestatus(url: string, fl: varargs[string]): int =
 
   let tries = 3  # Number of times to retry 
   var url = strip(url)
-  var returnval, j, errC = 0
+  var returnval, errC = 0
+  var j = 1
   var responsecode = -1
   var head, flag, wgethead, pe, redirurl = ""
 
@@ -496,11 +503,11 @@ proc webpagestatus(url: string, fl: varargs[string]): int =
 
   let command = "wget" & GX.wgetopts & "--content-on-error -SO- -q '" & url & "' 2>&1 > " & wgetbody
 
-  while j < tries:
+  while j <= tries:
 
     head = ""
 
-    if Debug.network: "Starting headers (" & $(j + 1) & ") for " & url >* "/dev/stderr"
+    if Debug.network: "Starting headers (" & $(j) & ") for " & url >* "/dev/stderr"
     if Debug.wgetlog: 
       wgethead = mktempname(GX.datadir & "wgethead.")
 
@@ -593,7 +600,7 @@ proc queryapiget(url, timestamp: string): string =
 
   let tries = 3
   var urlapi, japi, japi2 = ""
-  var j = 0
+  var j = 1
   var errC1, errC2 = 0
 
   if url !~ "^http": return "none"
@@ -602,12 +609,12 @@ proc queryapiget(url, timestamp: string): string =
 
   let wgetapi = "wget" & GX.wgetopts & "--header=\"Wayback-Api-Version: 2\" --post-data=\"url=" & urlapi & "\" -q -O- \"http://archive.org/wayback/available\""
  
-  while j < tries:
+  while j <= tries:
 
     japi = ""
     japi2 = ""
 
-    if Debug.network: "Starting API (get) (" & $(j + 1) & ") for " & urlapi >* "/dev/stderr"
+    if Debug.network: "Starting API (get) (" & $(j) & ") for " & urlapi >* "/dev/stderr"
 
     (japi, errC1) = execCmdEx(wgetapi)
     libutils.sleep(2)
@@ -665,7 +672,7 @@ proc queryapipost(internalcount: int): bool =
 
   if internalcount > 0:
 
-    while j < tries + 1:
+    while j <= tries:
 
       japi = ""
       japi2 = ""

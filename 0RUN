@@ -48,6 +48,8 @@ ________________________________________________________________________________
 
 3. Run AWB
 
+     * See AWB setup instructions in 0INSTALL 
+
      * Make a list in AWB of articles to process using meta/cb20151231-20160304.0021-0250/discovered
  
      Start the loading demon:

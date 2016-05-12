@@ -175,11 +175,6 @@ proc fixemptyarchive(tl: string): string =
       sendlog(Project.logemptyarch, CL.name, "cite1")
       return removearchive(tl, "fixemptyarchive1", "nocbignore")
 
-#    else:
-#      inc(GX.changes)
-#      sendlog(Project.logemptyarch, CL.name, "cite2")
-#      return removearchive(tl, "fixemptyarchive2", "nocbignore")
-
  # Wayback templates
 
   if datatype(tl,"wayback") and tl ~ "[|][ ]{0,}url[ ]{0,}=[ ]{0,}[|}]":
@@ -417,9 +412,6 @@ proc process_article(action, target: string) =
     "Error in process_article() for target " & target & ": no right target defined." >* "/dev/stderr"
     return
 
-#  "target = " & target >* "/dev/stderr"
-#  "action = " & action >* "/dev/stderr"
-
   let re = "[{][ ]{0,}[Cc]ite[^}]+}|[{][ ]{0,}[Cc]ita[^}]+}|[{][ ]{0,}[Vv]cite[^}]+}|[{][ ]{0,}[Vv]ancite[^}]+}|[{][ ]{0,}[Hh]arvrefcol[^}]+}|[{][ ]{0,}[Cc]itation[^}]+}"
 
  # Cite or Wayback templates inside ref pairs
@@ -441,11 +433,6 @@ proc process_article(action, target: string) =
 
             k = substr(Proc.citeinsideb[i], 0, endref - 1)
             
-#            echo "  target = " & target           
-#            echo "k = " & k
-#            echo "cbi = " & $cbignore(k)
-#            echo "bundeled = " & $bundled(k)
-
           # Cite templates
             if( k ~ "archive[-]{0,1}url[ ]{0,}[=]" and target == "citeinside" and not cbignore(k) and bundled(k) == 0 ):
               var d = ""
@@ -457,18 +444,18 @@ proc process_article(action, target: string) =
                 if action == "format":
                   tl = fixthespuriousone(tl)
                   tl = fixencodedurl(tl)
-                  if orig != tl:
+                  if orig != tl and len(tl) > 2:
                     GX.articlework = replacefullref(k, orig, tl, "citeinside1")
                     Proc.citeinsideb[i] = replacetext(Proc.citeinsideb[i], orig, tl, "citeinside1.1")
                 elif action == "getlinks":
                   fillarray(strip(url), "normal")
                 elif action == "process":
                   tl = fixbadstatus(tl)
-                  if orig != tl:
+                  if orig != tl and len(tl) > 2:
                     GX.articlework = replacefullref(k, orig, tl, "citeinside2")
               elif url == "" and action == "format":
                 tl = fixemptyarchive(tl)
-                if orig != tl:
+                if orig != tl and len(tl) > 2:
                   GX.articlework = replacefullref(k, orig, tl, "citeinside3")
                   Proc.citeinsideb[i] = replacetext(Proc.citeinsideb[i], orig, tl, "citeinside3.1")
 
@@ -477,7 +464,7 @@ proc process_article(action, target: string) =
               if action == "format":
                 var orig = k
                 k = fixemptywayback(k)
-                if orig != k:
+                if orig != k and len(k) > 2:
                   GX.articlework = replacefullref(orig, orig, k, "waybackinside1")
                   Proc.citeinsideb[i] = replacetext(Proc.citeinsideb[i], orig, tl, "waybackinside1.1")
 
@@ -493,7 +480,7 @@ proc process_article(action, target: string) =
                   tl = fixtrailingchar(tl)
                   tl = fixencodedurl(tl)
                   tl = fixemptyarchive(tl)
-                  if orig != tl:
+                  if orig != tl and len(tl) > 2:
                     GX.articlework = replacefullref(k, orig, tl, "waybackinside2")
                     Proc.citeinsideb[i] = replacetext(Proc.citeinsideb[i], orig, tl, "waybackinside2.1")
                 elif action == "getlinks":
@@ -502,7 +489,7 @@ proc process_article(action, target: string) =
                     fillarray(strip(url), "build", strip(date))
                 elif action == "process":
                   tl = fixbadstatus(tl, k)
-                  if orig != tl:
+                  if orig != tl and len(tl) > 2:
                     GX.articlework = replacefullref(k, orig, tl, "waybackinside3")
 
  # Cite/Wayback templates or Barelink outside ref pairs
@@ -510,12 +497,16 @@ proc process_article(action, target: string) =
   if target ~ "citeoutside|waybackoutside|bareoutside":
 
     if Proc.articlenorefc == -1:
+      var ix = -1
       Proc.articlenorefb = newSeq[string](0)
       Proc.articlenoref = GX.articlework
+      Proc.articlenoref = stripwikicomments(Proc.articlenoref)  # Remove wikicomments in case <ref></ref> is embeded in a comment
       gsub("<ref[^>]*/[ ]{0,}>", "", Proc.articlenoref)                                               # remove <ref name=string />    
-      Proc.articlenorefc = awk.split(Proc.articlenoref, Proc.articlenorefb, "<ref[^>]*>")           # remove <ref></ref>
+      Proc.articlenorefc = awk.split(Proc.articlenoref, Proc.articlenorefb, "<ref[^>]*>")             # remove <ref></ref>
       for i in 1..Proc.articlenorefc - 1:
-        Proc.articlenoref = replace(Proc.articlenoref, substr(Proc.articlenorefb[i], 0, index(Proc.articlenorefb[i], "</ref>") ), "")
+        ix = index(Proc.articlenorefb[i], "</ref>")
+        if ix > -1:
+          Proc.articlenoref = replace(Proc.articlenoref, substr(Proc.articlenorefb[i], 0, ix), "")
 
    # Cite templates outside ref pairs
     if target == "citeoutside":
@@ -534,10 +525,6 @@ proc process_article(action, target: string) =
 
           k = substr(Proc.citeoutsideb[i], 0, index(Proc.citeoutsideb[i], "}}") - 1)
 
-          #echo "proc = " & Proc.citeoutsideb[i]
-          #echo "k = " & k 
-          #echo "cbi = " & $cbignorebareline(GX.articlework, k)
-
           if k ~ "archive[-]{0,1}url[ ]{0,}[=]" and not cbignorebareline(GX.articlework, k):
             k = "{{" & k & "}}"
             match(k, re, d)
@@ -549,14 +536,14 @@ proc process_article(action, target: string) =
                 tl = fixthespuriousone(tl)
                 tl = fixencodedurl(tl)
                 tl = fixemptyarchive(tl)
-                if orig != tl:
+                if orig != tl and len(tl) > 2:
                   GX.articlework = replacetext(GX.articlework,orig,tl, "processoutside2")
                   Proc.citeoutsideb[i] = replacetext(Proc.citeoutsideb[i], orig, tl, "processoutside2.1")
               elif action == "getlinks":
                 fillarray(strip(url), "normal")
               elif action == "process":
                 tl = fixbadstatus(tl)
-                if orig != tl:
+                if orig != tl and len(tl) > 2:
                   GX.articlework = replacetext(GX.articlework, orig, tl, "processoutside3")
 
    # Bare links outside ref pairs ( for links encased in [] )
@@ -583,7 +570,7 @@ proc process_article(action, target: string) =
               tl = fixtrailingchar(tl)
               tl = fixencodedurl(tl)
               tl = fixemptyarchive(tl)
-              if orig != tl:
+              if orig != tl and len(tl) > 2:
                 GX.articlework = replacetext(GX.articlework, orig, tl, "processoutside4")
                 Proc.bareoutsideb[i] = replacetext(Proc.bareoutsideb[i], orig, tl, "processoutside4.1")
             elif action == "getlinks":
@@ -591,7 +578,7 @@ proc process_article(action, target: string) =
             elif action == "process":
               origfullel = Proc.bareoutsideb[i]
               newfullel = fixbadstatus(tl, origfullel)
-              if origfullel != newfullel:
+              if origfullel != newfullel and len(newfullel) > 2:
                 GX.articlework = replacetext(GX.articlework, origfullel, newfullel, "processoutside5")
 
 
@@ -605,6 +592,7 @@ process_article("format", "bareoutside")
 process_article("format", "citeoutside")
 process_article("format", "waybackinside")
 process_article("format", "citeinside")
+
 
   # Parse for IA links
 process_article("getlinks", "bareoutside")
@@ -624,19 +612,15 @@ for i in 0..GX.id:
     "--" >* "/dev/stderr"
   sendlog(Project.wayall, CL.name, WayLink[i].origiaurl)     # Print all Wayback URLs to file. Comment out during debugging.
 
-
-                                                             # Possible big performance hit consider alt method /or disable 
 if GX.numfound > 0:
-  if queryapipost(GX.numfound):
+  if queryapipost(GX.numfound):                              # Entry to medicapi.nim
     process_article("process", "bareoutside")
     process_article("process", "citeoutside")
     process_article("process", "waybackinside")
-    process_article("process", "citeinside")      # N.B.: this must be last?
+    process_article("process", "citeinside")                 # N.B.: this must be last?
   else:
     "Error in queryAPI() for " & CL.name & " : bad data. Skipped process_article(\"process\", ____)" >* "/dev/stderr"
     sendlog(Project.critical, CL.name, "queryapipost")
-
-
 
 if GX.article != GX.articlework:  # Only save if there was a change to the article
   GX.articlework >* GX.datadir & "article.waybackmedic.txt"

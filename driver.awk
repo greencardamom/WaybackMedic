@@ -48,6 +48,7 @@ BEGIN {
     exit
   }
 
+
   setProject(pid)     # library.awk .. load Project[] paths via project.cfg
 
   nano = substr(sys2var( Exe["date"] " +\"%N\""), 1, 4)

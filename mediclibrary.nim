@@ -70,12 +70,12 @@ proc setdatetype() =
       break
 
 #
-# Given an alt archive website url (eg. archive.is, webcite.org etc)
+# Given an alternative archive website url (eg. webcite.org etc) as it exists in WayLink[].altarchencoded 
 #  return the field value designated by "field" argument
 #
 proc altarchfield(url, field: string): string =
   for link in WayLink:
-    if countsubstring(link.altarch, url) > 0:
+    if countsubstring(link.altarchencoded, url) > 0:
       return fieldvalLO(link, field)
   return ""
 

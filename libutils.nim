@@ -1,4 +1,4 @@
-import awknim, strutils, uri, os
+import awk, strutils, uri, os
 
 discard """ 
 
@@ -83,7 +83,7 @@ proc stripwikicomments*(s: string): string =
     return build
   else:
     return s
-  return ""
+  return s
 #
 # Convert XML to plain
 #
@@ -178,7 +178,7 @@ proc insertsection*(source: string, start: int, new, caller: string): string =
     if i == start:
       if debug: "insertsection (trap 3)"  >* "/dev/stderr"
                                                             # Append space if "start" is | or }, and preceeding is not a space
-      if substrawk(source,i,1) ~ "[|]|[}]" and source[i - 1] != ' ':
+      if awk.substr(source,i,1) ~ "[|]|[}]" and source[i - 1] != ' ':
         if debug: "case 1" >* "/dev/stderr"
         insert(build, new & " ", i)
 

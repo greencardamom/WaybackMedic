@@ -9,7 +9,7 @@ Instructions for installing WaybackMedic and configuring AWB
 
 2. The following programs are required:
 
-    Nim           Install development release instructions here: http://howistart.org/posts/nim/1
+    Nim           Install development release follow instructions here: http://howistart.org/posts/nim/1
     GNU Awk 4.1+
     GNU Parallel 
     wdiff         (for colored inline diffs - apt-get install wdiff) (optional)
@@ -33,11 +33,16 @@ Instructions for installing WaybackMedic and configuring AWB
     ln -s bug.awk bug
     ln -s driver.awk driver
 
-5. Edit init.awk and set paths to programs 
+5. Edit init.awk and set paths to Exe["program"]
 
 6. Compile medic.nim
 
 	nim c medic.nim
+
+Follow directions for running see file 0RUN
+
+After completed return here and follow AWB setup steps below.
+
 
 == Configure AWB ==
 
