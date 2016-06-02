@@ -98,21 +98,14 @@ function main(    name,tempid,article,command) {
               }
               else {                                                    
                 if(length(article) != length(newarticle)) {
-                  prnt("demon-lin.awk: Article lengths out of sync (old=" length(article) " new=" length(newarticle) "). Re-running Wayback Medic ...")
-                  prnt("               old ID: " tempid)
-                  print article > tempid "article.old.txt"
-                  print newarticle > tempid "article.txt"
-                  close(tempid "article.old.txt")
-                  close(tempid "article.txt")
+                  prnt("demon-lin.awk: Article lengths out of sync (old=" length(article) " new=" length(newarticle) "). Saving to auth.demon ...")
                   if( checkexists(tempid "article.waybackmedic.txt") )
-                    removefile(tempid "article.waybackmedic.txt")                    
-                  command = Exe["bug"] " -n \"" name "\" -p \"" Project["id"] "\" -r"
-                  system(command)
-                  tempid = whatistempid(name, Project["index"] )
-                  prnt("               new ID: " tempid)
-                  article = readfile(tempid "article.txt")
-                  if(length(article) == 0) 
-                    abort("demon-lin.awk: Error unable to run Wayback Medic. " name)
+                    removefile(tempid "article.waybackmedic.txt")                   
+                  print name >> Project["meta"] "auth.demon" 
+                  close(Project["meta"] "auth.demon")
+                  sleep( delay )
+                  print "done" > Ramdisk "done.txt"
+                  close(Ramdisk "done.txt")
                 }
                 if(checkexists(tempid "article.waybackmedic.txt")) {
                   article = readfile(tempid "article.waybackmedic.txt")
@@ -124,12 +117,12 @@ function main(    name,tempid,article,command) {
                   close(Ramdisk "done.txt")
                 }
                 else {
-                  prnt("\ndemon-lin.awk: No changes to article.")
+                  abort("\ndemon-lin.awk: No changes to article (2).")
                 }
               }
             }
             else {
-              prnt("\ndemon-lin.awk: No changes to article.")
+              abort("\ndemon-lin.awk: No changes to article (1).")
             }
           }
       } 

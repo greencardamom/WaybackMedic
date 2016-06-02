@@ -33,11 +33,12 @@
 
 BEGIN {
 
+
   type = "view"                    # Default
   difftype = "c"
   capturetype = "a"
 
-  while ((C = getopt(ARGC, ARGV, "vrp:n:d:c:")) != -1) { 
+  while ((C = getopt(ARGC, ARGV, "svrp:n:d:c:")) != -1) { 
       opts++
       if(C == "p")                 #  -p <project>   Use project name. No default.
         pid = verifypid(Optarg)
@@ -58,6 +59,10 @@ BEGIN {
       if(C == "c") {               #  -c <type>      Capture output to clipboard. "a" for article.txt and "w" for article.wayback.txt
         type = "capture"
         capturetype = verifyval(Optarg)
+      }
+
+      if(C == "s") {               # -s              Generate SQL query for CB from meta/wayrm (delete) and meta/newiadate (modify)
+        type = "sql"
       }
 
       if(C == "h") {
@@ -104,6 +109,11 @@ BEGIN {
     exit
   }
 
+  if(type ~ /sql/) {
+    sqlquery()
+    exit
+  }
+
 }
 
 
@@ -147,7 +157,7 @@ function run(name,   command) {
 #exit
 
   getindex(name)
-  command = "./medic -p \"" Project["id"] "\" -n \"" name "\" -s \"" Inx["path"] "article.txt\" -d n"
+  command = Exe["medic"] " -p \"" Project["id"] "\" -n \"" name "\" -s \"" Inx["path"] "article.txt\" -d n"
   system(command)
 
 }
@@ -198,6 +208,141 @@ function whatistempid(name, filepath,      s, a, re) {
   return 0
 }
 
+
+#
+# sqlquery - generate a SQL query for the CB database. See email discussion dated May 24 2016 with Max for details.
+#
+function sqlquery(  url, iaurl, c, a, b, d, i, newdate, part_when_null, part_when_zero, part_where, part_when_one, part_when_url, part_when_date, year, month, day, hour, minute, second) {
+
+  if(! checkexists(Project["meta"] "wayrm.sql") ) {
+    print("Error unable to find " Project["meta"] "wayrm.sql")
+    return 0
+  }
+  if(! checkexists(Project["meta"] "newiadate.sql") ) {
+    print("Error unable to find " Project["meta"] "newiadate.sql")
+    return 0
+  }
+
+  # ---------- wayrm ---------- #
+
+  c = split(readfile(Project["meta"] "wayrm.sql"),a,"\n")  
+  while(i++ < c) {
+    if(split(a[i], b, "----") > 0) {
+      url = strip(wayurlurl(b[2]))
+      if(length(url) == 0) continue
+      if(url ~ /^http%3A/)
+        gsub(/^http%3A/, "http:", url)
+      if(url ~ /^https%3A/)
+        gsub(/^https%3A/, "https:", url)
+      url = escsql(url)
+      if(i == c - 1) {
+        part_where = part_where sprintf("'%s'", url)
+        part_when_zero = part_when_zero sprintf("\tWHEN '%s' THEN 0", url)
+        part_when_null = part_when_null sprintf("\tWHEN '%s' THEN NULL", url)
+      }
+      else {
+        part_where = part_where sprintf("'%s', ", url)
+        part_when_zero = part_when_zero sprintf("\tWHEN '%s' THEN 0\n", url)
+        part_when_null = part_when_null sprintf("\tWHEN '%s' THEN NULL\n", url)
+      }
+    }
+  }
+  print "UPDATE externallinks_global"
+  print "SET `has_archive` = CASE `url`"
+  print part_when_zero
+  print "END,"
+  print "`archived` = CASE `url`"  
+  print part_when_zero
+  print "END,"
+  print "`archive_url` = CASE `url`"
+  print part_when_null
+  print "END,"
+  print "`archive_time` = CASE `url`"
+  print part_when_null  
+  print "END"
+  print "WHERE `url` IN (" part_where ");"  
+
+  # ---------- newiadate ---------- #
+
+  part_where = ""
+  i = 0
+  c = split(readfile(Project["meta"] "newiadate.sql"),a,"\n")  
+  while(i++ < c) {
+    if(split(a[i], b, "----") > 0) {
+      split(b[2], d, " ")
+      url = strip(d[1])
+      if(length(url) == 0) continue
+      if(url ~ /^http%3A/)
+        gsub(/^http%3A/, "http:", url)
+      if(url ~ /^https%3A/)
+        gsub(/^https%3A/, "https:", url)
+      url = escsql(url)
+      iaurl = "https://web.archive.org/web/" d[3] "/" url
+      year = substr(d[3], 1, 4)
+      if(year == 0 || length(year) < 4)
+        year = "1970"
+      month = substr(d[3], 5, 2)
+      if(month == 0 || length(month) < 2)
+        month = "01"
+      day = substr(d[3], 7, 2)
+      if(day == 0 || length(day) < 2)
+        day = "01"
+      hour = substr(d[3], 9, 2)
+      if(hour == 0 || length(hour) < 2)
+        hour = "00"
+      minute = substr(d[3], 11, 2)
+      if(minute == 0 || length(minute) < 2)
+        minute = "00"
+      second = substr(d[3], 13, 2)
+      if(second == 0 || length(second) < 2)
+        second = "00"
+
+      newdate = year "-" month "-" day " " hour ":" minute ":" second
+
+      if(i == c - 1) {
+        part_where = part_where sprintf("'%s'", url)
+        part_when_one = part_when_one sprintf("\tWHEN '%s' THEN 1", url)
+        part_when_url = part_when_url sprintf("\tWHEN '%s' THEN '%s'", url, iaurl)
+        part_when_date = part_when_date sprintf("\tWHEN '%s' THEN '%s'", url, newdate)
+      }
+      else {
+        part_where = part_where sprintf("'%s', ", url)
+        part_when_one = part_when_one sprintf("\tWHEN '%s' THEN 1\n", url)
+        part_when_url = part_when_url sprintf("\tWHEN '%s' THEN '%s'\n", url, iaurl)
+        part_when_date = part_when_date sprintf("\tWHEN '%s' THEN '%s'\n", url, newdate)
+      }
+    }
+  }
+  print "\nUPDATE externallinks_global"
+  print "SET `has_archive` = CASE `url`"
+  print part_when_one
+  print "END,"
+  print "`archived` = CASE `url`"  
+  print part_when_one
+  print "END,"
+  print "`archive_url` = CASE `url`"
+  print part_when_url
+  print "END,"
+  print "`archive_time` = CASE `url`"
+  print part_when_date  
+  print "END"
+  print "WHERE `url` IN (" part_where ");"  
+
+}
+
+#
+# Escape a string for SQL (for URI type data)
+#   https://dev.mysql.com/doc/refman/5.7/en/string-literals.html
+#
+function escsql(str,   safe) {
+
+  safe = str
+  gsub(/'/,"\\'",safe)
+  gsub(/%/,"\\%",safe)
+  gsub(/_/,"\\_",safe)
+
+  return safe
+}
 
 function usage() {
 

@@ -427,6 +427,34 @@ proc bundled*(s: string): int =
   return 0
 
 #
+# Given a 14-char datestamp, return true if the dates and times are within normal ranges
+#
+proc validate_datestamp(stamp: string): bool =
+
+  var vyear, vmonth, vday, vhour, vmin, vsec = ""
+
+  if len(stamp) == 14:
+  
+    vyear = system.substr(stamp, 0, 3)
+    vmonth = system.substr(stamp, 4, 5)
+    vday = system.substr(stamp, 6, 7)
+    vhour = system.substr(stamp, 8, 9)
+    vmin = system.substr(stamp, 10, 11)
+    vsec = system.substr(stamp, 12, 13)
+
+    if vyear !~ "^(19[0-9]{2}|20[0-9]{2})$": return false
+    if vmonth !~ "^(0[1-9]|1[012])$": return false
+    if vday !~ "^(0[1-9]|1[0-9]|2[0-9]|3[01])$": return false
+    if vhour !~ "^(0[0-9]|1[0-9]|2[0123])$": return false
+    if vmin !~ "^(0[0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])$": return false
+    if vsec !~ "^(0[0-9]|1[0-9]|2[0-9]|3[0-9]|4[0-9]|5[0-9])$": return false
+
+  else: 
+    return false
+
+  return true
+
+#
 # Given an archive.org URL, return the date stamp portion
 #  https://archive.org/web/20061009134445/http://timelines.ws/countries/AFGHAN_B_2005.HTML ->
 #   20061009134445

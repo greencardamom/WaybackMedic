@@ -35,6 +35,9 @@ BEGIN {
 
   # If you have installed wdiff (for color inline diffs)
   Exe["coldiff"] = Home "coldiff"
+
+  Exe["bug"] = Home "bug.awk"
+  Exe["medic"] = Home "medic"
  
   delete Config
   readprojectcfg()

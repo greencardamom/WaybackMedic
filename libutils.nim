@@ -78,7 +78,9 @@ proc stripwikicomments*(s: string): string =
   var c = patsplit(s, field, "<[ ]{0,}[!][^>]*>", sep)
   var build = sep[0]
   for i in 1..c - 1:
-    build = build & sep[i]
+    if sep[i] !~ "<[ ]{0,}[!][ ]{0,}[-]":
+      build = build & sep[i]
+  #  build = build & sep[i]
   if build.len > 0:
     return build
   else:
@@ -178,9 +180,17 @@ proc insertsection*(source: string, start: int, new, caller: string): string =
     if i == start:
       if debug: "insertsection (trap 3)"  >* "/dev/stderr"
                                                             # Append space if "start" is | or }, and preceeding is not a space
-      if awk.substr(source,i,1) ~ "[|]|[}]" and source[i - 1] != ' ':
-        if debug: "case 1" >* "/dev/stderr"
-        insert(build, new & " ", i)
+      if awk.substr(source,i,1) ~ "[|]|[}]":
+        if i > 0:
+          if source[i - 1] != ' ':
+            if debug: "insertsection (case 1)" >* "/dev/stderr"
+            insert(build, new & " ", i)
+          else:
+            if debug: "insertsection (case 4)" >* "/dev/stderr"
+            insert(build, new, i)
+        else:
+          insert(build, new, i)
+          if debug: "insertsection (case 3)"  >* "/dev/stderr"
 
       else:
         insert(build, new, i)
@@ -233,6 +243,7 @@ proc replacetext*(source, old, new, caller: string): string =
       echo "|" & old & "| is " & $old.len & " chars long."
       var msg = "Replacetext(2): Aborted: found " & intToStr(c) & " copy(s) of string (" & old & ") in source"
       msg >* "/dev/stderr"
+    gsub("[*][*][*][!][!][*][*][*]", "\n", source)   # For multi-line templates.. restore \n
     return source
 
   var safe = source
@@ -311,15 +322,26 @@ proc uriparseEncodeurl*(url: string): string =
   if url == "" or url == nil:
     return ""
 
-  var u = parseUri(url)
+  var u: Uri
   var p, q, a, newurl = ""
+
+  try:
+    u = parseUri(url)
+  except:
+    return ""
 
   if url ~ "^//":                    # default to http:// if..
     newurl = "http:" & url           #  ..relative protocol
-    u = parseUri(newurl)
+    try:
+      u = parseUri(newurl)
+    except:
+      return ""
   elif u.scheme ~ "[.]" or u.scheme.len == 0:
     newurl = "http://" & url         #  ..no protocol
-    u = parseUri(newurl)
+    try:
+      u = parseUri(newurl)
+    except:
+      return ""
 
   if u.port.len > 0:
     p = ":" & u.port
@@ -367,7 +389,7 @@ proc handleHexChar(c: char, x: var int) {.inline.} =
   of '0'..'9': x = (x shl 4) or (ord(c) - ord('0'))
   of 'a'..'f': x = (x shl 4) or (ord(c) - ord('a') + 10)
   of 'A'..'F': x = (x shl 4) or (ord(c) - ord('A') + 10)
-  else: assert(false)
+  else: x = x
 
 #
 # Decode URL. Modified version of stdlib cgi:decodeUrl()

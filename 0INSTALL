@@ -13,15 +13,17 @@ Instructions for installing WaybackMedic and configuring AWB
     GNU Awk 4.1+
     GNU Parallel 
     wdiff         (for colored inline diffs - apt-get install wdiff) (optional)
+    tcsh          (http://www.tcsh.org/MostRecentRelease)
     
 2. Create two sub-directories "data" and "meta" (eg. mkdir data; mkdir meta)
 
-3. Edit the following files and change the first line hash-bang #!/ to the location of GNU Awk    
+3. Edit the following files and change the first line hash-bang #!/ to the location of GNU Awk 4.1 (or greater)    
 
     ucontribs.awk
     project.awk
     bug.awk
     driver.awk
+    deletename.awk
 
     Set the above files to executable (eg. chmod 750 ucontribs.awk) 
     Set coldiff script executable
@@ -33,7 +35,7 @@ Instructions for installing WaybackMedic and configuring AWB
     ln -s bug.awk bug
     ln -s driver.awk driver
 
-5. Edit init.awk and set paths to Exe["program"]
+5. Edit init.awk and set paths to Exe["program_name"]
 
 6. Compile medic.nim
 

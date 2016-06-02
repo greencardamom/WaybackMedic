@@ -46,6 +46,77 @@ proc api(url: string): string =
         return "none"
   return "none"
 
+
+#
+# Given an IA URL, check the timestamp date/time are within normal range 
+#  eg. this is wrong: http://web.archive.org/web/20131414230300/http://www.iter.org/proj/iterandbeyond
+# If out of range, download page and web scrape for correct date and return corrected URL
+#
+proc validiaurl(url: string): string =
+
+  var command, body = ""
+  var errC = 0
+  var newstamp, re, vhour, vmin, vsec, vmonth, vday, vyear = ""
+
+  var url = strip(url)
+  var stamp = urltimestamp(url)
+
+  if validate_datestamp(stamp) == false:
+
+    if Debug.network: ("Out of range for " & url) >* "/dev/stderr"
+
+    if url ~ "'":
+      gsub("'","%27",url)    # shell escape literal string
+
+    let command = "wget" & GX.wgetopts & "-O- -q '" & url & "'"
+
+    (body, errC) = execCmdEx(command)
+
+    if len(body) == 0:
+      return url
+
+    if match(body, "FILE ARCHIVED ON [0-9]{1,2}[:][0-9]{1,2}[:][0-9]{1,2}[^A]*AND[ ]RETRIEVED", dest) > 0:
+
+      if match(dest, "[0-9]{1,2}[:][0-9]{1,2}[:][0-9]{1,2}", dest2) > 0:
+        if awk.split(dest2, a, ":") == 3:
+          vhour = a[0]
+          if len(vhour) == 1: vhour = "0" & vhour
+          vmin  = a[1]
+          if len(vmin) == 1: vmin = "0" & vmin
+          vsec  =  a[2]
+          if len(vsec) == 1: vsec = "0" & vsec
+
+      if match(dest, " (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ", dest2) > 0:
+        if dest2 == " Jan ": vmonth = "01"
+        if dest2 == " Feb ": vmonth = "02"
+        if dest2 == " Mar ": vmonth = "03"
+        if dest2 == " Apr ": vmonth = "04"
+        if dest2 == " May ": vmonth = "05"
+        if dest2 == " Jun ": vmonth = "06"
+        if dest2 == " Jul ": vmonth = "07"
+        if dest2 == " Aug ": vmonth = "08"
+        if dest2 == " Sep ": vmonth = "09"
+        if dest2 == " Oct ": vmonth = "10"
+        if dest2 == " Nov ": vmonth = "11"
+        if dest2 == " Dec ": vmonth = "12"
+
+        re = dest2 & "[0-9]{1,2}[,][ ][0-9]{4}"
+
+        if match(dest, re, dest3) > 0:
+          if awk.split(dest3, b, " ") == 4:
+            if match(b[2], "[0-9]{1,2}", vday) > 0:
+              if len(vday) == 1:
+                vday = "0" & vday
+            if len(b[3]) == 4:
+              vyear = b[3]
+
+      newstamp = vyear & vmonth & vday & vhour & vmin & vsec
+      newstamp = strip(newstamp)
+      if validate_datestamp(newstamp) == true:
+        gsub(stamp,newstamp,url)
+
+  return url
+
 #
 # Memento API JSON -> MemLink object
 #  example url:
@@ -150,9 +221,12 @@ proc japi2waylink(japi: string): int =
                   for h, p in pairs(o):
                     if h == "closest":
                       WayLink[tag].newurl = WayLink[tag].origurl
-                      WayLink[tag].newiaurl = formatediaurl(strip(gsub("^\"|\"$", "", $p["url"])), "barelink")
                       WayLink[tag].available = strip(gsub("^\"|\"$", "", $p["available"]))
-                      if WayLink[tag].available == "true": WayLink[tag].available = "wayback"
+                      if WayLink[tag].available == "true": 
+                        WayLink[tag].available = "wayback"
+                        WayLink[tag].newiaurl = validiaurl(formatediaurl(strip(gsub("^\"|\"$", "", $p["url"])), "barelink"))
+                      else:
+                        WayLink[tag].newiaurl = formatediaurl(strip(gsub("^\"|\"$", "", $p["url"])), "barelink")
                       WayLink[tag].status = strip(gsub("^\"|\"$", "", $p["status"]))
                       count.inc
                 else:                        # empty result "{}"
@@ -186,7 +260,7 @@ proc japi2singleurl(japi: string): string =
                 if h == "closest":
                   val = strip( gsub("^\"|\"$", "", $p["url"]) )
                   if val ~ "^http":
-                    return val
+                    return validiaurl(val)
                   else:
                     return "none"
   return "none"
@@ -727,7 +801,12 @@ proc queryapipost(internalcount: int): bool =
       if WayLink[tag].status ~ "^2":                                      # API reports 2xx
           if WayLink[tag].newiaurl != "none":
             status = webpagestatus(WayLink[tag].newiaurl)
-            if status == 5:
+            if status == 1:                                               # If newiaurl is different from origiaurl, but origiaurl is working use that.
+              if urltimestamp(WayLink[tag].origiaurl) != urltimestamp(WayLink[tag].newiaurl):
+                status = webpagestatus(WayLink[tag].origiaurl)
+                if status == 1:
+                  WayLink[tag].newiaurl = WayLink[tag].origiaurl
+            elif status == 5:
               if Debug.network: "Step A1: 503 SERVERS DOWN." >* "/dev/stderr"
               sendlog(Project.critical, CL.name, " 503_servers_down A1")
               return false

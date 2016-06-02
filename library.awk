@@ -1101,8 +1101,10 @@ function getwikisource(namewiki, redir,    f,ex,k,a,command,urlencoded,r) {
       print "Found a redirect:"
       match(f, "[#][ ]{0,}[Rr][Ee][^]]*[]]", r)
       print r[0]
-      if(redir ~ /dontfollow/) 
+      if(redir ~ /dontfollow/) {
+        print namewiki " : " r[0] >> "redirects"
         return ""
+      }
       ex = http2var("https://en.wikipedia.org/wiki/Special:Export/" urlencoded)
       match(ex,/<redirect title=\"[^\"]*\"/,k)
       if( length(k[0]) > 0) {

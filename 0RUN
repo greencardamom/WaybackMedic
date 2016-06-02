@@ -12,7 +12,8 @@
    signifies the type of data in the file (a list of articles edited by a certain author). 
 
    The above typically only needs to be done one time before running WaybackMedic. The following 
-   steps break the list down into smaller batch runs.
+   steps break the list down into smaller batch runs. These steps can be automated in a future
+   revision of the bot.
 
 ___________________________________________________________________________________________________
 
@@ -28,15 +29,20 @@ ________________________________________________________________________________
      parallel -a meta/cb20151231-20160304.0001-1000/auth -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.0001-1000 -n {}
 
    Here we are running GNU Parallel to process the 1000 names of the project id cb20151231-20160304.0001-1000
-   "-j 2" tells how many processes to run at one time. My 4-CPU i7 can handle 20 for example. 
+   "-j 2" tells how many processes to run at one time. My 4-CPU i7 can handle 20+ for example. 
    Cut and paste the above line, replace "cb20151231-20160304.0001-1000" with your project name.
 
 2.1 Create the index file
 
-   ./project -j -p cb20151231-20160304.0001-1000
-   mv meta/cb20151231-20160304.0001-1000/index.temp meta/cb20151231-20160304.0001-1000/index.temp.old
+     ./project -j -p cb20151231-20160304.0001-1000
+     mv meta/cb20151231-20160304.0001-1000/index.temp meta/cb20151231-20160304.0001-1000/index.temp.old
 
-2.2 View diff's of results, re-run medic for individual articles
+   * Backup files
+
+     cd meta/cb20151231-20160304.0001-1000
+     cp index index.temp.run1 ; mkdir run1 ; cp * run1
+
+2.2 View diff's of results, re-run medic for individual articles if needed
 
    View the proposed article diffs to verify it is working before uploading to Wikipedia 
 
@@ -46,19 +52,75 @@ ________________________________________________________________________________
    2. ./bug -n "Charles Dickens" -v
       (to view data file locations and the command to re-run medic for that name)
 
+3. Re-run critical, A1 and redirect cases (must be run using tcsh shell)
+
+   cd ~/wm
+   mv redirects meta/cb20151231-20160304.0001-1000
+   cd meta/cb20151231-20160304.0001-1000
+   awk -F" : #" '{s = $2;gsub(/[Rr][Ee][Dd][Ii][Rr][Ee][Cc][Tt][ ]{0,}\[\[/,"",s); p = substr(s, 1, length(s) - 1); if(p ~ "#") print substr(p, 1, index(p, "#") - 1); else print p}' redirects > auth.critical
+   awk -F" : #" '{s = $1; gsub(/\(|\)|\?|\*/,"\\\\&", s); gsub(/'"'"'/, "'"'"'\"'"'"'\"'"'"'", s ); printf("grep -Ev %c^%s%c auth > o ; mv o auth\n",0x27,s,0x27)}' redirects | tcsh
+   cat auth.critical >> auth
+   awk -F"----" '{print $1}' critical >> auth.critical
+   grep " A1" bogusapi | awk -F"----" '{print $1}' >> auth.critical
+   awk '\! s[$0]++' auth.critical > o; mv o auth.critical
+   cp ~/wm/deletename* .
+   ./deletenamewrapper critical 
+
+   # Re-run using auth.critical as input
+   cd ~/wm
+   parallel -a meta/cb20151231-20160304.0001-1000/auth.critical -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.0001-1000 -n {}
+   # Re-assemble index
+   ./project -j -p cb20151231-20160304.0001-1000
+   cd meta/cb20151231-20160304.0001-1000
+   mv index.temp index.temp.critical   
+
+
 3. Run AWB
 
      * See AWB setup instructions in 0INSTALL 
 
-     * Make a list in AWB of articles to process using meta/cb20151231-20160304.0021-0250/discovered
- 
-     Start the loading demon:
+3.1 Load and run AWB
 
-       ./demon-lin-wm-auto.awk -p cb20151231-20160304.0001-1000 -d 0
+   cd meta/cb20151231-20160304.0001-1000
+   cp discovered /mnt/ramdisk/discovered.txt
+   * load discovered.txt into AWB
+   cd ~/wm
+   ./demon-lin-wm-auto.awk -p cb20151231-20160304.0001-1000 -d0 
+   * Run AWB
 
-     * Run AWB
+3.2 Re-run articles that changed (only need to run if auth.demon exist)
+   
+   # Delete auth.demon names from log files
+   cd meta/cb20151231-20160304.0001-1000
+   tcsh deletenamewrapper demon
+   # Re-run using auth.demon as input
+   mv index.temp index.temp.old
+   cd ~/wm
+   parallel -a meta/cb20151231-20160304.0001-1000/auth.demon -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.0001-1000 -n {}
+   # Re-assemble index
+   ./project -j -p cb20151231-20160304.0001-1000
+   cd meta/cb20151231-20160304.0001-1000
+   mv index.temp index.temp.demonX (1 to X)
 
-     The loading demon will feed articles to AWB. It has pause delays built-in which can be changed with the -d parameter. 
-     The loading demon can run in a VirtualBox linux box, send articles to a shared directory with Windows, where the Windows
-     version of the demon exected by AWB (demon-win.awk) will pass it to AWB. Or it can all run natively under Windows. 
+3.3 Load and run AWB   
+
+   cp auth.demon /mnt/ramdisk/auth.demon.txt
+   mv auth.demon auth.demon.runX (1..X)
+   * load list into AWB
+   ./demon-lin-wm-auto.awk -p cb20151231-20160304.0001-1000 -d0 
+   * Run AWB
+
+4. Repeat step 2->3 if needed (articles that have changed) until no more show up in auth.demon 
+
+5. Create wayrm.sql and newiadate.sql files for sending to Cyberbot
+
+   cd meta/cb20151231-20160304.0001-1000
+   rm o; awk '{gsub(/'"'"'/, "'"'"'\"'"'"'\"'"'"'", $0 ); printf("grep %c%s%c wayrm >> o\n", 0x27, $0, 0x27)}' auth | tcsh
+   awk '\!s[$0]++' o > wayrm.sql
+   rm o; awk '{gsub(/'"'"'/, "'"'"'\"'"'"'\"'"'"'", $0 ); printf("grep %c%s%c newiadate >> o\n", 0x27, $0, 0x27)}' auth | tcsh
+   awk '\!s[$0]++' o > newiadate.sql
+   cd ~/wm
+   ./bug -p cb20151231-20160304.0001-1000 -s > o
+   mv o /mnt/ramdisk/cb20151231-20160304.0001-1000
+
 
