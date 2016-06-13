@@ -33,7 +33,7 @@
 
 BEGIN {
 
-  while ((C = getopt(ARGC, ARGV, "jyabicxhp:d:m:s:")) != -1) { 
+  while ((C = getopt(ARGC, ARGV, "jyabicxhp:d:m:s:t:")) != -1) { 
       opts++
       if(C == "p")                 #  -p <project>   Use project name. No default.
         pid = verifypid(Optarg)
@@ -59,6 +59,10 @@ BEGIN {
         type = "checkstring"        
         searchfile = verifyval(Optarg)
       }
+      if(C == "t") {               #  -t <filename>  Generate project statistics. Filename contains a list of project IDs
+        type = "stats"        
+        statsfile = verifyval(Optarg)
+      }
 
       if(C == "h") {
         usage()
@@ -82,6 +86,11 @@ BEGIN {
     exit
   }
 
+  if(type ~ /stats/) {
+    if(length(statsfile) > 0)
+      statistics(statsfile, mid)
+    exit
+  }
   if(type ~ /checkstring/) {
     if(length(searchfile) > 0)
       check_string(searchfile, pid, did, mid)
@@ -421,7 +430,7 @@ function check_fixspurone(pid, did, mid,    command,files,stampdir,c,i,re) {
 function check_string(filename, pid, did, mid,    re,c,files,stampdir,i,command,count) {
 
  # Be careful with escaping as unsure how grep responds 
-  re = "[>][|]url[=]"
+  re = "web[.]http"
 
   files = sys2var(Exe["ls"] " " did pid "/")
 
@@ -468,6 +477,95 @@ function whatisindexname(name, filepath,      s, a, re) {
   return 0
 }
 
+
+#
+# Generate project stats. Create a file with a list of project ID's and run with the -t <filename> switch
+#
+#
+function statistics(statsfile, mid,    c,a,i,b) {
+
+  if(! checkexists(statsfile) ) {
+    print("Error unable to find " statsfile )
+    return 0
+  }
+  c = split(readfile(statsfile), a, "\n")
+
+  while(i++ < c) {
+    if(length(a[i]) > 1) {
+      stats[a[i]]["bummer"] = split(readfile(mid a[i] "/bummer"), b, "\n")
+      stats[a[i]]["bogusapi"] = split(readfile(mid a[i] "/bogusapi"), b, "\n")
+      stats[a[i]]["apimismatch"] = split(readfile(mid a[i] "/apimismatch"), b, "\n")
+      stats[a[i]]["discovered"] = split(readfile(mid a[i] "/discovered"), b, "\n")
+      stats[a[i]]["jsonmismatch"] = split(readfile(mid a[i] "/jsonmismatch"), b, "\n")
+      stats[a[i]]["log404"] = split(readfile(mid a[i] "/log404"), b, "\n")
+      stats[a[i]]["logemptyarch"] = split(readfile(mid a[i] "/logemptyarch"), b, "\n")
+      stats[a[i]]["logemptyway"] = split(readfile(mid a[i] "/logemptyway"), b, "\n")
+      stats[a[i]]["logencode"] = split(readfile(mid a[i] "/logencode"), b, "\n")
+      stats[a[i]]["logspurone"] = split(readfile(mid a[i] "/logspurone"), b, "\n")
+      stats[a[i]]["logtrail"] = split(readfile(mid a[i] "/logtrail"), b, "\n")
+      stats[a[i]]["logdeadurl"] = split(readfile(mid a[i] "/logdeadurl"), b, "\n")
+      stats[a[i]]["newaltarch"] = split(readfile(mid a[i] "/newaltarch"), b, "\n")
+      stats[a[i]]["newiadate"] = split(readfile(mid a[i] "/newiadate"), b, "\n")
+      stats[a[i]]["redirects"] = split(readfile(mid a[i] "/redirects"), b, "\n")
+      stats[a[i]]["wayrm"] = split(readfile(mid a[i] "/wayrm"), b, "\n")
+      stats[a[i]]["wayall"] = split(readfile(mid a[i] "/wayall"), b, "\n")
+      stats[a[i]]["zombielinks"] = split(readfile(mid a[i] "/zombielinks"), b, "\n")
+
+      print "\n____________________ " a[i] " ______________________________"
+
+      print "Bummer         : " stats[a[i]]["bummer"] "\t (Wayback links that return \"Bummer page not found\")"
+      print "Bogusapi       : " stats[a[i]]["bogusapi"] "\t (Wayback API-returned links that don't match real status code)"
+      print "API mismatch   : " stats[a[i]]["apimismatch"] "\t (Wayback API returned fewer records than sent.)"
+      print "JSON mismatch  : " stats[a[i]]["jsonmismatch"] "\t (Wayback API returned different size JSON)" 
+      print "Discovered     : " stats[a[i]]["discovered"] "\t (Number of articles edited by WaybackMedic)"
+      print "Log 404        : " stats[a[i]]["log404"] "\t (Dead wayback links)"
+      print "Log emptyarch  : " stats[a[i]]["logemptyarch"] "\t (Empty archiveurl arguments)"
+      print "Log emptyway   : " stats[a[i]]["logemptyway"] "\t (Ref has an empty {{wayback}})"
+      print "Log encode     : " stats[a[i]]["logencode"] "\t (URL misencoded)"
+      print "Log spurious 1 : " stats[a[i]]["logspurone"] "\t (Spurious \"|1=\" parameter)"
+      print "Log trail      : " stats[a[i]]["logtrail"] "\t (URL has a trailing bad character)"
+      print "Log dead URL   : " stats[a[i]]["logdeadurl"] "\t (|url= is dead even though dead-url=no, archiveurl is dead and no {{dead}})"
+      print "New alt archive: " stats[a[i]]["newaltarch"] "\t (Replaced with archive URL found at Mementoweb.org)"
+      print "New IA date    : " stats[a[i]]["newiadate"] "\t (Changed snapshot date)"
+      print "Redirects      : " stats[a[i]]["redirects"] "\t (Page was a redirect)"
+      print "Zombie links   : " stats[a[i]]["zombielinks"] "\t (Links needing removal by hand)"
+      print "Wayback RM     : " stats[a[i]]["wayrm"] "\t (Wayback link deleted)"
+      print "Wayback All    : " stats[a[i]]["wayall"] "\t (Wayback links total found)"
+    }
+  }
+
+  # Sum totals
+  for(proj in stats) {
+    for(field in stats[proj]) 
+      stats["total"][field] = stats["total"][field] + stats[proj][field]
+  }  
+
+
+  print "\n_________________________________________________________"
+  print "                     Total"
+  print "_________________________________________________________\n"
+
+  print "Bummer         : " stats["total"]["bummer"] "\t (Wayback links that return \"Bummer page not found\")"
+  print "Bogusapi       : " stats["total"]["bogusapi"] "\t (Wayback API-returned links that don't match real status code)"
+  print "API mismatch   : " stats["total"]["apimismatch"] "\t (Wayback API returned fewer records than sent.)"
+  print "JSON mismatch  : " stats["total"]["jsonmismatch"] "\t (Wayback API returned different size JSON)" 
+  print "Discovered     : " stats["total"]["discovered"] "\t (Number of articles edited by WaybackMedic)"
+  print "Log 404        : " stats["total"]["log404"] "\t (Dead wayback links)"
+  print "Log emptyarch  : " stats["total"]["logemptyarch"] "\t (Empty archiveurl arguments)"
+  print "Log emptyway   : " stats["total"]["logemptyway"] "\t (Ref has an empty {{wayback}})"
+  print "Log encode     : " stats["total"]["logencode"] "\t (URL misencoded)"
+  print "Log spurious 1 : " stats["total"]["logspurone"] "\t (Spurious \"|1=\" parameter)"
+  print "Log trail      : " stats["total"]["logtrail"] "\t (URL has a trailing bad character)"
+  print "Log dead URL   : " stats["total"]["logdeadurl"] "\t (|url= is dead even though dead-url=no, archiveurl is dead and no {{dead}})"
+  print "New alt archive: " stats["total"]["newaltarch"] "\t (Replaced with archive URL found at Mementoweb.org)"
+  print "New IA date    : " stats["total"]["newiadate"] "\t (Changed snapshot date)"
+  print "Redirects      : " stats["total"]["redirects"] "\t (Page was a redirect)"
+  print "Zombie links   : " stats["total"]["zombielinks"] "\t (Links needing removal by hand)"
+  print "Wayback RM     : " stats["total"]["wayrm"] "\t (Wayback link deleted)"
+  print "Wayback All    : " stats["total"]["wayall"] "\t (Wayback links total found)"
+
+
+}
 
 
 function usage() {

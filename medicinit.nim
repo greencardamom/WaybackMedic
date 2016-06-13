@@ -178,6 +178,7 @@ type
     logtrail*: string
     logemptyway*: string
     logencode*: string
+    logdeadurl*: string
 
 var Project*: ProjectObj
 
@@ -376,6 +377,7 @@ proc setup(pid: string): bool {.discardable.} =
   Project.logtrail = Project.meta & "logtrail"
   Project.logemptyway = Project.meta & "logemptyway"
   Project.logencode = Project.meta & "logencode"
+  Project.logdeadurl = Project.meta & "logdeadurl"
 
   documentation()
 

@@ -555,7 +555,7 @@ proc getredirurl(origurl, filename: string): string =
 #
 proc webpagestatus(url: string, fl: varargs[string]): int =
 
-  let tries = 3  # Number of times to retry 
+  var tries = 3  # Number of times to retry 
   var url = strip(url)
   var returnval, errC = 0
   var j = 1
@@ -566,6 +566,9 @@ proc webpagestatus(url: string, fl: varargs[string]): int =
     flag = fl[0]
   else:
     flag = ""
+
+  if flag == "one":
+    tries = 1
 
   if url ~ "'": 
     gsub("'","%27",url)    # shell escape literal string
@@ -599,7 +602,7 @@ proc webpagestatus(url: string, fl: varargs[string]): int =
     else:
       break
 
-  if j == tries:
+  if j == tries and (len(head) == 0 or responsecode == -1):
     if Debug.network: "Headers time out" >* "/dev/stderr"
     sendlog(Project.timeout, CL.name, "headers:" & url)
     returnval = -1
@@ -626,9 +629,13 @@ proc webpagestatus(url: string, fl: varargs[string]): int =
       else:
         returnval = 1
 
-    elif responsecode == 503 or responsecode == 504 or responsecode == 417:   # 417 bot rate exceeded
+    elif responsecode == 503 or responsecode == 504: # API error
       returnval = 5
       responsecode = 503
+
+    elif responsecode == 417: 
+      if Debug.network: "417 bot rate limit exceeded / cache busting detected" >* "/dev/stderr"
+      returnval = 0
 
     pe = pageerror(wgetbody)
     if pe == "bummer":

@@ -38,7 +38,7 @@ BEGIN {
   difftype = "c"
   capturetype = "a"
 
-  while ((C = getopt(ARGC, ARGV, "svrp:n:d:c:")) != -1) { 
+  while ((C = getopt(ARGC, ARGV, "zusvrp:n:d:c:")) != -1) { 
       opts++
       if(C == "p")                 #  -p <project>   Use project name. No default.
         pid = verifypid(Optarg)
@@ -63,6 +63,14 @@ BEGIN {
 
       if(C == "s") {               # -s              Generate SQL query for CB from meta/wayrm (delete) and meta/newiadate (modify)
         type = "sql"
+      }
+
+      if(C == "u") {               # -u              Search for articles that contain the "deadurl=no" bug where it added a {{dead link} when it shouldn't have
+        type = "deadu"
+      }
+
+      if(C == "z") {               # -z              Search for articles that contain links that should have been deleted
+        type = "zombie"
       }
 
       if(C == "h") {
@@ -114,6 +122,16 @@ BEGIN {
     exit
   }
 
+  if(type ~ /deadu/) {
+    deadurlbug()
+    exit
+  }
+
+  if(type ~ /zombie/) {
+    zombielinkbug()
+    exit
+  }
+
 }
 
 
@@ -159,6 +177,61 @@ function run(name,   command) {
   getindex(name)
   command = Exe["medic"] " -p \"" Project["id"] "\" -n \"" name "\" -s \"" Inx["path"] "article.txt\" -d n"
   system(command)
+
+}
+
+#
+# Search for zombie links bug - links that should have been deleted but still exist in the article.
+#
+function zombielinkbug(  c,a,i,b,name,link,fp) {
+
+  c = split(readfile(Project["wayrm"]), a, "\n")
+  while(i++ < c) {
+    split(a[i], b, "----")
+    name = b[1]
+    link = b[2]
+    getindex(name)
+    if(checkexists(Inx["path"] "article.waybackmedic.txt")) {
+      fp = readfile(Inx["path"] "article.waybackmedic.txt")
+      if(countsubstring(fp, link) > 0) 
+        print name " : " link
+    }
+    else  {
+      if(length(strip(name)) > 0) 
+        print name " : " link
+    }
+
+
+  }
+
+}
+
+#
+# Search for articles containing the deadurl bug where {{dead link}} was added to cites on removal of a non-working IA URL, but still had a working url= parameter
+#
+function deadurlbug(  c,a,i,b,name,path,totala,totalw,fp) {
+
+  c = split(readfile(Project["index"]), a, "\n")
+  while(i++ < c) {
+    if(split(a[i], b, "|")) {
+      name = b[1]
+      path = b[2]
+      totala = 0
+      totalw = 0
+      fp = ""
+      if(checkexists(path "article.waybackmedic.txt")) {
+        fp = readfile(path "article.txt")
+        totala += gsub(/dead[-]{0,1}url[ ]{0,}[=][ ]{0,}[Nn][Oo]/, "", fp)
+        if(int(totala) > 0) {
+          fp = readfile(path "article.waybackmedic.txt")
+          totalw += gsub(/dead[-]{0,1}url[ ]{0,}[=][ ]{0,}[Nn][Oo]/, "", fp)
+          if(int(totala) != int(totalw)) {
+            print name
+          }
+        }
+      }
+    }
+  }
 
 }
 

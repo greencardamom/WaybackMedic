@@ -665,6 +665,8 @@ function insertsection(source, start, new, caller,  i,out,space) {
 #   Example: print countsubstring("[do&d?run*d!run>run*", "run*")
 #            2
 #
+#   To count substring using regex use gsub ie. total += gsub("[.]","",str)
+#
 function countsubstring(str, pat,    len, i, c) {
   c = 0
   if( ! (len = length(pat) ) ) {

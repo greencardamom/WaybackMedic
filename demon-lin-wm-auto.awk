@@ -67,7 +67,7 @@ function main(    name,tempid,article,command) {
 
   while(1) {
 
-    sleep(2)
+    sleep(1)
     Z++
     if(Z > 500) {   # time-out. 2500 = about 90 minutes w/ 2sec sleep
       print "demon-lin.awk: Time out"
@@ -91,14 +91,17 @@ function main(    name,tempid,article,command) {
           }         
           else {
             if(checkexists(tempid "article.waybackmedic.txt"))  {  # Skip if no changes were made.
-              newarticle = getwikisource(name, "dontfollow")
-              article = strip(readfile(tempid "article.txt"))
+#              newarticle = getwikisource(name, "dontfollow")
+#              article = strip(readfile(tempid "article.txt"))
+              newarticle = strip(getwikisource(name, "dontfollow"))
+              article = stripfile(tempid "article.txt")
               if(length(newarticle) == 0 || length(article) == 0) {
                 abort("demon-lin.awk: Error unable to retrieve wikisource or article.txt. " name)
               }
               else {                                                    
-                if(length(article) != length(newarticle)) {
-                  prnt("demon-lin.awk: Article lengths out of sync (old=" length(article) " new=" length(newarticle) "). Saving to auth.demon ...")
+#               if(length(article) != length(newarticle)) {
+                if(article != newarticle) {
+                  prnt("demon-lin.awk: Articles out of sync (old=" length(article) " new=" length(newarticle) "). Saving to auth.demon ...")
                   if( checkexists(tempid "article.waybackmedic.txt") )
                     removefile(tempid "article.waybackmedic.txt")                   
                   print name >> Project["meta"] "auth.demon" 

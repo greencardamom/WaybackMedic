@@ -63,6 +63,9 @@ BEGIN {
 
         if ( ! ucontribs(entity,sdate,edate) )
           print 0
+     
+        print "Total sources rescued: " totalc > "/dev/stderr"
+
 }
 
 function ucontribs(entity,sdate,edate,      url, results) {
@@ -101,7 +104,7 @@ function getapiresults(url, entity,          xmlin, xmlout, continuecode) {
         return xmlout
 }
 
-function parsexml(xmlin,   f,g,e,c,a,i,b,d,out,comment,title){
+function parsexml(xmlin,   f,g,e,c,a,i,b,d,out,comment,title,dest1,dest2){
 
   f = split(xmlin,e,/<usercontribs>|<\/usercontribs>/)
   c = split(e[2],a,"/>")
@@ -113,8 +116,13 @@ function parsexml(xmlin,   f,g,e,c,a,i,b,d,out,comment,title){
       title = convertxml(g[2])
       match(a[i], /parsedcomment="[^\"]*"/,k)
       comment = gensub("parsedcomment=","","g",k[0])
-      if(comment ~ /IABot/)
+      if(comment ~ /Rescuing [0-9]{1,} sources/) {
         out = out title "\n"
+        match(comment, /Rescuing [0-9]{1,} sources/, dest1)
+        match(dest1[0], /[ ][0-9]{1,}[ ]/, dest2)
+        totalc = totalc + strip(dest2[0])
+      }
+      #out = out title "\n"
     }
   }
   return out

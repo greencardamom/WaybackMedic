@@ -38,7 +38,7 @@ THE SOFTWARE."""
 #
 proc fixthespuriousone(tl: string): string =
   var s = ""
-  if match(tl, "[|][ ]?[1-9][ ]?=[ ]{0,}[^|}]", s) > 0:
+  if match(tl, "[|][ ]?[1-9][ ]?=[ ]{0,}[^|}<]", s) > 0:
     inc(GX.changes)
     sendlog(Project.logspurone, CL.name, "cite1")
     return replacetext(tl, s, "", "fixspuriousone1")
@@ -156,18 +156,18 @@ proc fixemptyarchive(tl: string): string =
     if urlencoded ~ "^http":
 
       if Debug.network: "Checking fixemptyarchive step 1" >* "/dev/stderr"
-      status = webpagestatus(url)
+      status = webpagestatus(url, "one")
       if status == 1 or status == 3:              # Leave empty arguments in place if url= is working
         return tl
 
       if Debug.network: "Checking fixemptyarchive step 2" >* "/dev/stderr"
-      status = webpagestatus(urlencoded)
+      status = webpagestatus(urlencoded, "one")
       if status == 1 or status == 3:              # Try again with encoding
         return tl
 
       if Debug.network: "Checking fixemptyarchive step 3" >* "/dev/stderr"
       libutils.sleep(2)
-      status = webpagestatus(url)
+      status = webpagestatus(url, "one")
       if status == 1 or status == 3:              # Try third time after pause
         return tl
 
@@ -195,8 +195,8 @@ proc fixemptyarchive(tl: string): string =
 proc fixbadstatus(ttl: string, fr: varargs[string]): string =
 
   var tl = ttl
-  var url, urlarch, newurl, newdate, olddate, waybackdate, k, str = ""
-  var i = 0
+  var url, urlarch, urlencoded, newurl, newdate, olddate, waybackdate, k, str = ""
+  var i, status = 0
   var fullref = ""
   
   if fr.len > 0:
@@ -235,11 +235,36 @@ proc fixbadstatus(ttl: string, fr: varargs[string]): string =
         sendlog(Project.log404, CL.name, "cite-modifyaltarch")
         sendlog(Project.newaltarch, CL.name, getargurl(tl) & " " & urltimestamp(urlarch) & " " & newurl & " " & newdate)
         return tl
+
       else:                                                                   # Delete
+
         inc(GX.changes)
         sendlog(Project.log404, CL.name, "cite-delete")
         sendlogwayrm(Project.wayrm, CL.name, urlarch, tl)
-        return removearchive(tl, "fixbadstatuscite5")
+
+        url = getargurl(tl)
+
+        if url ~ "^http" and tl ~ "dead[-]{0,1}url[ ]{0,}[=][ ]{0,}[Nn][Oo]":      # Don't leave {{dead link}}+{{cbignore}} if url= is working
+
+          # Known sites that usually return soft 404
+          if url ~ "findarticles[.]com|lemonde[.]fr|bilbao[.]net|channelnewsasia[.]com|news[.]com[.]au|blogs[.]telegraph[.]co[.]uk":
+            return removearchive(tl, "fixbadstatuscite8")
+
+          urlencoded = uriparseEncodeurl(urldecode(url))             
+
+          if Debug.network: "Checking fixemptyarchive step 1" >* "/dev/stderr"
+          status = webpagestatus(url, "one")
+          if status == 1 or status == 3:           
+            sendlog(Project.logdeadurl, CL.name & "----" & url, "fixbadstatuscite5")
+            return removearchive(tl, "fixbadstatuscite5", "nodeadlink")   
+
+          if Debug.network: "Checking fixemptyarchive step 2" >* "/dev/stderr"
+          status = webpagestatus(urlencoded, "one")
+          if status == 1 or status == 3:              # Try again with encoding
+            sendlog(Project.logdeadurl, CL.name & "----" & url, "fixbadstatuscite5")
+            return removearchive(tl, "fixbadstatuscite6", "nodeadlink")
+
+        return removearchive(tl, "fixbadstatuscite7")
     else:
       sendlog(Project.log404, CL.name, "citeErrorB")
       return tl

@@ -343,7 +343,10 @@ proc getargarchive*(tl, arg: string, mag: varargs [string]): string =
 #                  
 # Remove deadurl, archiveurl & archivedate from template and add {{cbignore}} and {{dead link}}
 #
-#  flag="nocbignore" means don't add it
+#  flag is optional parameter. If used set to one of these two:
+#    flag="nocbignore" means don't add {{cbignore}} but add {{dead link}}
+#    flag="nodeadlink" means don't add {{dead link}} or {{cbignore}}
+#  no flag argument = add both 
 #                  
 proc removearchive(tl, caller: string, fl: varargs[string]): string =
 
@@ -367,6 +370,8 @@ proc removearchive(tl, caller: string, fl: varargs[string]): string =
   if debug: "removearchive (4) = " & tl >* "/dev/stderr"
   if flag == "nocbignore":
     tl = tl & "{{dead link|date=" & todaysdate() & "|bot=medic}}"
+  elif flag == "nodeadlink":
+    tl = tl 
   else:
     tl = tl & "{{dead link|date=" & todaysdate() & "|bot=medic}}{{cbignore|bot=medic}}"
   if debug: "removearchive (5) = " & tl >* "/dev/stderr"
