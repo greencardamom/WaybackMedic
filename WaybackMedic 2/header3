@@ -1,0 +1,1 @@
+wget --content-on-error -SO- -q --retry-connrefused --waitretry=1 --read-timeout=2 --timeout=5 --tries=1 --no-dns-cache --no-check-certificate --user-agent="Green Cardamom: CLI header tool" $1 

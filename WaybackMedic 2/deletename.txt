@@ -1,0 +1,7 @@
+To re-run driver you need to backup log files and remove log entries of the names you want to re-run to prevent duplicates.
+
+1. Copy all existing files to "mkdir run1; cp * run1"
+
+2. Edit deletenameswrapper and make sure it looks OK
+
+3. cat deletenameswrapper | csh

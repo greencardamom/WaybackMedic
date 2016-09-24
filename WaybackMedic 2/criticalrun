@@ -1,0 +1,6 @@
+awk -F" : #" 'BEGINFILE{if (ERRNO) nextfile}{s = $2;gsub(/[Rr][Ee][Dd][Ii][Rr][Ee][Cc][Tt][ ]{0,}\[\[/,"",s); p = substr(s, 1, length(s) - 1); if(p ~ "#") print substr(p, 1, index(p, "#") - 1); else print p}' redirects > auth.critical
+awk -F" : #" 'BEGINFILE{if (ERRNO) nextfile}{s = $1; gsub(/\(|\)|\?|\*/,"\\\\&", s); gsub(/'"'"'/, "'"'"'\"'"'"'\"'"'"'", s ); printf("grep -Ev %c^%s%c auth > o ; mv o auth\n",0x27,s,0x27)}' redirects | tcsh
+cat auth.critical >> auth
+awk -F"----" 'BEGINFILE{if (ERRNO) nextfile} {print $1}' critical >> auth.critical
+awk -F"----" '/ A1/{print "grep \"" $1 "\" wayrm"}' bogusapi | tcsh | awk -F"----" '{print $1}' >> auth.critical
+awk 'BEGINFILE{if (ERRNO) nextfile} ! s[$0]++' auth.critical > o; mv o auth.critical

@@ -1,6 +1,6 @@
 WaybackMedic bot
 ===================
-Bot info page at Wikipedia: https://en.wikipedia.org/wiki/User:Green_Cardamom/WaybackMedic
+Bot info page at Wikipedia: https://en.wikipedia.org/wiki/User:Green_Cardamom/WaybackMedic_2 
 
 by User:Green Cardamom (en.wikipedia.org)
 March 2016
@@ -11,17 +11,15 @@ Source
 Nim 0.13.1
 GNU Awk 4.1
 
-The core functionality is medic.nim. 
+The core functionality is medic.nim which copiles to a binary executable "medic"
 
 driver.awk "drives" (executes) medic, which in turn is executed by GNU Parallel in batches
 
-project is a tool for creating and managing batches of articles for processing by medic
+project.awk is a tool for creating and managing batches of articles for processing by medic
 
-bug is a tool to view article diffs after processing to see what changes medic proposed
+bug.awk is a tool to view article diffs after processing to see what changes medic proposed
 
-demon-* is the communication layer with AWB 
-
-When running AWB, if the demon detects changes to an article since medic processed it, it will re-process the article real-time to prevent unintended reverts
+demon-* is the communication layer with AWB - deprecated with WaybackMedic2 in favor of Pywikibot
 
 Install and operate
 ==================

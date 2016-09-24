@@ -1,0 +1,1 @@
+wget --header="Wayback-Api-Version: 2" --post-data="url=$1&closest=before&statuscodes=200&statuscodes=203&statuscodes=206&tag=&timestamp=20070101" -q -O- "http://archive.org/wayback/available"

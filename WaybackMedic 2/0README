@@ -1,0 +1,136 @@
+
+==Instructions==
+
+A. Make a list of articles that need processing. 
+   Use search.nim to run a search of the Wikipedia database.
+
+   See "0RUN" and "0INSTALL" in the Wayback 1 directory for more info what to do.
+
+   Then follow steps below they are the most up to date for version 2.
+
+_____________________________________________________________________________________________
+
+B. Run medic
+
+1. Create a new project files
+
+    ./project -c -p cb20151231-20160304.0001-1000
+
+2. Run medic in parallel
+
+   * Clear out old temp dir
+   rm /tmp/wm-*
+   * Run parallel (12 max)
+   parallel -a meta/cb20151231-20160304.0001-1000/auth -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.0001-1000 -n {} 
+   * While it's running, run this in another window to monitor progress:
+   ./parallelwatch -t 900 -p cb20151231-20160304.0001-1000 
+
+
+3. Check data
+
+   * If medic was aborted, remove any index.temp entry lines staring with "|" (grep -E "^\|" index.temp)
+   * Re-assemble index 
+   (meta) mv index.temp index
+
+   * Verify directories in index are uniq (numbers match). Run project -i if needed to recreate index, but after the first run of medic only.
+   (meta) wc -l index; awk -F\| '{print $2}' index | sort | uniq | wc
+
+   * Backup files
+   (meta) cp index index.temp.run1 ; mkdir run1 ; cp * run1
+
+4. Re-run critical, A1 and redirect cases 
+
+   (meta) mv /home/adminuser/wmnim/wm2/redirects .
+          ./criticalrun
+          ./deletenamewrapper critical ; wc -l auth.critical ; bell; bell
+
+   # Re-run using auth.critical as input
+   parallel -a meta/cb20151231-20160304.10001-20000/auth.critical -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.10001-20000 -n {}
+   # Re-assemble index
+   ./project -j -p cb20151231-20160304.10001-20000
+   (meta) mv index.temp index.temp.critical; mv redirects redirects.orig; mv /home/adminuser/wmnim/wm2/redirects redirects
+
+5. (OPTIONAL) Re-run wayrm and newia cases 
+
+   (meta) mv wayrm wayrm.orig; mv newiadate newiadate.orig
+          awk -F"----" '{print $1}' wayrm.orig newiadate.orig | sort | uniq > auth.wayrmnewiadate
+          ./deletenamewrapper wayrmnewiadate
+   parallel -a meta/cb20151231-20160304.10001-20000/auth.wayrmnewiadate -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.10001-20000 -n {}
+   ./project -j -p cb20151231-20160304.10001-20000
+          mv index.temp index.temp.wayrmnewiadate; mv redirects redirects.critical; mv /home/adminuser/wmnim/wm2/redirects redirects
+
+
+6. Check wayrm for any spurious trailing characters:
+
+   (meta) awk '{c=split($0,a,""); if(a[c] ~ /[.]|[,]|[-]|[:]/) print $0 }' wayrm
+
+   Check wayrm for any remaining A1's that need to be checked manually:
+
+    awk -F"----" '/ A1/{print "grep \"" $1 "\" wayrm"}' bogusapi | tcsh | awk -F"----" '{print "grep \"" $1 "\" auth.critical"}' | tcsh | 
+      awk '{print "grep \"" $0 "\" wayrm"}' | tcsh
+
+    Check all links. Any still not working, make a list and re-run step 5 as auth.wayrmX (2, 3 etc)
+
+    Re-run step 6, any STILL not working, remove manually from wayrm and discovered
+
+______________________________
+
+C. Run API 
+ 
+1. Run API (first)
+
+   (meta) cp discovered discovered.orig
+   ./push2wiki -p all20160820.050001-100000 -d0 -b1
+   * when done discovered should be 0-length or missing
+   * IF discovered.error exists:
+     (meta) mv discovered.error discovered
+     ./push2wiki -p all20160820.050001-100000 -d0 -b1
+     * repeat until no error
+
+2. Re-run articles that changed (only run if auth.demon exist)
+   
+   (meta) ./deletenamewrapper demon; bell; sleep 2; bell
+          mv index.temp index.temp.rerunX ; mv timeout timeout.rerunX; mv critical critical.rerunX
+   parallel -a meta/cb20151231-20160304.10001-20000/auth.demon -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.10001-20000 -n {}
+   * Same time in another window:
+     ./parallelwatch -t 900 -p cb20151231-20160304.0001-1000 
+   ./project -j -p cb20151231-20160304.10001-20000
+   (meta) mv index.temp index.demon.runX; mv redirects redirects.demon.runX; mv /home/adminuser/wmnim/wm2/redirects redirects
+   If a new timeout or critical shows up, re-run those
+
+3. Run API (second, third, ..)
+
+   (meta) cp discovered discovered.demon.runX (1..X)
+          mv auth.demon auth.demon.runX (1..X)
+   ./push2wiki -p all20160820.050001-100000 -d0 -b1
+   * IF discovered.error exists:
+     (see steps in C.1)
+
+4. Repeat steps C.2-4 until no more show up in auth.demon 
+
+5. (rerun critical cases?) See step B.4
+
+6. Manual cleanup
+
+ 6.1. Find and remove/edit zombie links. These are mostly because limitation
+      of regex when there is more than 1 copy of a string it doesn't know which to delete/modify. 
+
+   ./bug -p cb20151231-20160304.00001-10000 -z  >  meta/cb20151231-20160304.00001-10000/zombielinks
+
+ 6.2. Find and remove critical failures. These are articles the API broke down processing.
+
+   (meta) cat critical
+          grep <article name> *
+   * For link each in wayrm, that has not already been removed, manually remove from the article. 
+     Keep a master list of links 'criticaldeadlinks' and create a SQL file from it when ready using ./bug -s
+
+7. Create wayrm.sql and newiadate.sql files for sending to Cyberbot
+   (meta) ./sqlrun
+   ./bug -p cb20151231-20160304.0021-0250 -s > meta/cb20151231-20160304.0021-0250/cb20151231-20160304.0021-0250.sql
+   mv o /mnt/ramdisk/cb20151231-20160304.0021-0250
+   (then use FTP to deli:~/ftp-pub/cb, push to Tools, log in there and rename to .sql)
+
+
+_________________________________
+
+     

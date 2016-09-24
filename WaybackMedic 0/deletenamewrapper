@@ -1,0 +1,60 @@
+#!/usr/bin/tcsh -f
+
+if($1 == "critical") then
+  ./deletename.awk -n auth.$1 -l critical > critical.o
+  mv critical.o critical
+endif
+
+./deletename.awk -n auth.$1 -l discovered > discovered.o
+mv discovered.o discovered
+
+./deletename.awk -n auth.$1 -l wayrm > wayrm.o
+mv wayrm.o wayrm
+
+./deletename.awk -n auth.$1 -l wayall > wayall.o
+mv wayall.o wayall
+
+./deletename.awk -n auth.$1 -l timeout > timeout.o
+mv timeout.o timeout
+
+./deletename.awk -n auth.$1 -l newiadate > newiadate.o
+mv newiadate.o newiadate
+
+./deletename.awk -n auth.$1 -l newaltarch > newaltarch.o
+mv newaltarch.o newaltarch
+
+./deletename.awk -n auth.$1 -l logtrail > logtrail.o
+mv logtrail.o logtrail
+
+./deletename.awk -n auth.$1 -l logspurone > logspurone.o
+mv logspurone.o logspurone
+
+./deletename.awk -n auth.$1 -l logencode > logencode.o
+mv logencode.o logencode
+
+./deletename.awk -n auth.$1 -l logemptyway > logemptyway.o
+mv logemptyway.o  logemptyway
+
+./deletename.awk -n auth.$1 -l logemptyarch > logemptyarch.o
+mv logemptyarch.o  logemptyarch
+
+./deletename.awk -n auth.$1 -l logdeadurl > logdeadurl.o
+mv logdeadurl.o  logdeadurl
+
+./deletename.awk -n auth.$1 -l log404 > log404.o
+mv log404.o log404
+
+./deletename.awk -n auth.$1 -l jsonmismatch > jsonmismatch.o
+mv jsonmismatch.o jsonmismatch
+
+./deletename.awk -n auth.$1 -l cbignore > cbignore.o
+mv cbignore.o cbignore
+
+./deletename.awk -n auth.$1 -l bummer > bummer.o
+mv bummer.o bummer
+
+./deletename.awk -n auth.$1 -l bogusapi > bogusapi.o
+mv bogusapi.o bogusapi
+
+./deletename.awk -n auth.$1 -l apimismatch > apimismatch.o
+mv apimismatch.o apimismatch

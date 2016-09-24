@@ -1,0 +1,88 @@
+==Instructions==
+
+A. Make a list of uniq articles touched by Cyberbot across a date range. Only needed once.
+
+    ./ucon -n "Cyberbot II" -s "20151231" -e "20160304" > meta/cb20151231-20160304.auth
+
+_____________________________________________________________________________________________
+
+B. Run medic
+
+1. Create a new project files
+
+    ./project -c -p cb20151231-20160304.0001-1000
+
+2. Run medic in parallel
+
+   * Clear out old temp dir
+   rm /tmp/wm-*
+   * Run parallel (12 max)
+   parallel -a meta/cb20151231-20160304.0001-1000/auth -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.0001-1000 -n {} 
+
+3. Check data
+
+   * If medic was aborted, remove any index.temp entry lines staring with "|" (grep -E "^\|" index.temp)
+   * Re-assemble index 
+   ./project -j -p cb20151231-20160304.0001-1000
+   * Verify all directories in index are uniq. Run project -i if needed on the first run only.
+   awk -F\| '{print $2}' meta/cb20151231-20160304.0001-1000/index | sort | uniq | wc
+   * Backup files
+   cp index index.temp.run1 ; mkdir run1 ; cp * run1
+
+4. Re-run critical and A1 cases caused by timeouts
+
+   # Make auth.critical preparing for re-run
+   awk -F"----" '{print $1}' critical > auth.critical
+   grep " A1" bogusapi | awk -F"----" '{print $1}' >> auth.critical
+   awk '\! s[$0]++' auth.critical > o; mv o auth.critical
+   # Copy in deletename scripts
+   cp ~/wm/deletename* .
+
+   # Delete names from log files 
+   ./deletenamewrapper critical 
+   # Re-run using auth.critical as input
+   parallel -a meta/cb20151231-20160304.10001-20000/auth.critical -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.10001-20000 -n {}
+   # Re-assemble index
+   ./project -j -p cb20151231-20160304.10001-20000
+   mv index.temp index.temp.critical   
+
+5. Manually check any remaining to make sure they are not false negatives
+
+   grep " A1" bogusapi
+   cat critical
+
+______________________________
+
+C. Run AWB
+ 
+1. Load and run AWB
+
+   cp discovered /mnt/ramdisk/discovered.txt
+   * load list into AWB
+   ./demon-lin-wm-auto.awk -p cb20151231-20160304.0021-0250 -d0 -ms
+   * Run AWB
+
+2. Re-run articles that changed (only run if auth.demon exist)
+   
+   # Delete auth.demon names from log files
+   tcsh deletenamewrapper demon
+   # Re-run using auth.demon as input
+   mv index.temp index.temp.old
+   parallel -a meta/cb20151231-20160304.10001-20000/auth.demon -r --delay 2 --trim lr -k -j 2 ./driver -p cb20151231-20160304.10001-20000 -n {}
+   # Re-assemble index
+   ./project -j -p cb20151231-20160304.10001-20000
+   mv index.temp index.temp.demonX (1 to X)
+
+3. Load and run AWB   
+
+   cp auth.demon /mnt/ramdisk/auth.demon.txt
+   mv auth.demon auth.demon.runX (1..X)
+   * load list into AWB
+   ./demon-lin-wm-auto.awk -p cb20151231-20160304.0021-0250 -d0 -ms
+   * Run AWB
+
+4. Repeat step 2 (re-run articles that have changed) until none more show up in auth.demon 
+
+5. (rerun critical cases?) See step B.4
+
+
