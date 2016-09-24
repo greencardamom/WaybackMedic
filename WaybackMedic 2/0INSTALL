@@ -1,0 +1,62 @@
+Installation 
+=========================
+
+Instructions for installing WaybackMedic 2 
+
+== WaybackMedic 2 ==
+
+1. Download all WaybackMedic 2 files to a directory (eg. /home/user/wm)
+
+2. The following programs are required:
+
+    Nim           Install development release follow instructions here: http://howistart.org/posts/nim/1
+    Pywikibot     (https://www.mediawiki.org/wiki/Manual:Pywikibot)
+    GNU Awk 4.1+
+    GNU Parallel 
+    tcsh          (http://www.tcsh.org/MostRecentRelease)
+    wdiff         (for colored inline diffs - apt-get install wdiff) (optional)
+
+2. Create two sub-directories "data" and "meta" (eg. mkdir data; mkdir meta)
+
+3. Edit the following files and change the first line hash-bang #!/ to the location of GNU Awk 4.1 (or greater)    
+
+    ucontribs.awk
+    project.awk
+    bug.awk
+    driver.awk
+    deletename.awk
+    push2wiki.awk
+
+    Set the above files to executable (eg. chmod 750 ucontribs.awk) 
+    Set coldiff script executable
+
+4. Symlinks to make life easier:
+
+    ln -s ucontribs.awk ucon
+    ln -s project.awk project
+    ln -s bug.awk bug
+    ln -s driver.awk driver
+    ln -s push2wiki.awk push2wiki
+
+5. Edit init.awk and set paths to Exe["program_name"]
+
+6. Compile medic.nim - this is the core program for processing a single article.
+
+	nim c medic.nim
+
+7. Setup Pywikibot. This is the framework for logging in and sending changes to Wikipedia.
+
+   a. Run the Pywikibot setup script if not already done during install.
+   b. Copy savepage.py to where Pywikibot is located (same directory as user-config.py)
+      Set executable (chmod 755 savepage.py)
+   c. Set the path of Pywikibot (same as step b.) for Exe["pywikibotsavepage"] in init.awk
+   d. Add a 'setenv PYWIKIBOT2_DIR <path>' pointing to the same path as step b. Add to your .login or .bashrc script
+   e. Edit ~pywikibot/pywikibot/page.py
+      Find the line: pywikibot.output(u"Page %s saved" % link)
+      Right below it (same indent level) add the line: print "OKMEDIC"
+   f. Edit ~pywikibot/pywikibot/throttle.py
+      Find the line: message = (u"Sleeping for %(seconds).1f seconds
+      Right above it add the line: sleep = 1
+
+Follow directions for running see file 0RUN
+
