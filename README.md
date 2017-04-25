@@ -6,6 +6,10 @@ by User:Green Cardamom (en.wikipedia.org)
 March 2016
 MIT License
 
+Caution
+=======
+Version 2.0 is outdated and has many small bugs that are fixed in 2.1 - it's not recommended for production use. Version 2.1 will be uploaded sometime in the future. If you need it sooner please contact me on Wikipedia.
+
 Source
 ========
 Nim 0.13.1
