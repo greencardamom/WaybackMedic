@@ -1,0 +1,92 @@
+Installation 
+=========================
+
+Instructions for installing WaybackMedic 2.1
+
+== WaybackMedic 2.1 ==
+
+1. Download all WaybackMedic 2.1 files to a directory (eg. /home/user/wm21)
+
+2. The following programs are required:
+
+    Nim           Tested with 0.18
+    GNU Awk 4.1+  Tested with 4.1.3
+    Lua           Tested with 5.2.3  - for base62.lua
+    Python        Tested with 2.7.6  - for cloudflare.py
+    Node.js       Tested with 8.11.3 - for robotsparser.js and some headless browsers (see below)
+    GNU Parallel  Tested with 20130922
+    Firefox       Web browser
+    tcsh          http://www.tcsh.org/MostRecentRelease - for a few scripts
+    wdiff         For colored inline diffs - apt-get install wdiff 
+    lynx          Tested with 2.8.8pre.4
+    curl and wget Late models
+
+3. Create two sub-directories "data" and "meta" (eg. mkdir data; mkdir meta)
+   Edit project.cfg and update location of these directories. Note to include the trailing "/"
+   Create two sub-directories "dataimp" and "metaimp" 
+   Edit projimp.cfg and update location of these directories. Note to include the trailing "/"
+
+4. Edit the following files and change the first line hash-bang #!/ to the location of language binary
+
+    *.awk
+    modules/*/*.awk
+    cloudflare.py and base62.lua 
+    All files in ~/scripts 
+
+    Set the above files to executable (eg. chmod 750 iab.awk) 
+
+    Set coldiff script executable
+
+5. Symlinks make life easier:
+
+    ln -s api.awk api
+    ln -s bugm.awk bugm
+    ln -s driverm.awk driverm
+    ln -s iab.awk iab
+    ln -s iabget.awk iabget
+    ln -s imp.awk imp
+    ln -s parallelwatch.awk parallelwatch
+    ln -s projectm.awk projectm
+    ln -s runmedic.awk runmedic
+
+    Note: some end in "m" (bugm) to differentiate from the versions installed with BotWikiAwk
+          the "m" versions are customized for WaybackMedic
+
+6. Clone and install BotWikiAwk
+
+    A. Clone: https://github.com/greencardamom/BotWikiAwk
+    B. Follow install directions: https://en.wikipedia.org/wiki/User:GreenC/BotWikiAwk
+    C. Replace the default ~/botwikiawk/lib/botwiki.awk with the version included with WaybackMedic. 
+         Update any hard-coded paths in botwiki.awk for your system
+    D. 'wikiget' should be installed with BotWikiAwk (log out of window and back in, check paths) 
+       If not, see https://github.com/greencardamom/Wikiget and install
+       You will need Oauth credentials see instructions for wikiget. 
+       You will need a bot account with botflag permissions.
+
+6A. Fix paths
+
+    Edit ~/scripts/push and change the hard-coded path
+
+    Edit medicinit.nim and set these paths (customize):
+      GX.home = "/home/adminuser/wm21/"
+      putEnv("SLIMERJSLAUNCHER","/home/adminuser/firefox58/firefox")
+
+      (the "firefox" is the binary location of firefox on the system)
+
+    Edit 0RUN and change hard-coded paths
+
+7. Install Slimerjs and Phantomjs for robots.txt checking
+
+    Install these two headless browsers which require Node.js
+    Edit medicapi.nim locate "commandPhantom" and "commandFirefox" and update hard paths to these programs
+
+8. Install Cloudflare for bypassing bot checkers
+
+    https://github.com/Anorov/cloudflare-scrape
+
+9. Compile medic.nim - this is the core program for processing a single article.
+
+	nim c medic.nim
+
+Follow directions for running see file 0RUN
+

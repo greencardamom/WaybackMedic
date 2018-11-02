@@ -1,0 +1,3 @@
+awk '! s[$0]++' wayrm > wayrm.sql
+awk '! s[$0]++' newiadate > newiadate.sql
+awk '! s[$0]++' logskindeep > logskindeep.sql

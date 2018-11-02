@@ -1,0 +1,100 @@
+== Notes for running imp.awk ==
+
+The second, it would be good to have a mechanism to mark in the database when a link has been verified, and with a date it was verified. This will allow 
+IMP to track links so it doesn't re-verify them later. It also allows IABot to force a link change in the wikitext when there's a discrepancy. This way 
+IABot can take over from Medic. Otherwise even if IMP updates the database, IABot won't replace the link in the wikitext if one already exists. So this 
+flag tells IABot the database is a more accurate source than the wikitext and it's safe to make the change.
+
+---
+
+To answer your second query, there is a hidden column in the DB, that has this flag. It's called "reviewed". It's set when the archive URL has been 
+modified by a user with the interface or the API. So when GreenC bot is changing archives, it sets the reviewed flag. Also if the archive is removed, by 
+a user or API using bot, it will set the reviewed flag. When IABot first sees a URL, it's flag for whether or not it is archived somewhere is set to 
+unknown. This flag has it checking the Wayback Machine for one, and if it can't find one, is then set to false. If it does have an archive, it's set to 
+true. This is used in the future to determine if an archive exists or not and is what allows IABot to forgo checking the Wayback Machine next time.
+
+HOWEVER, if a user or other bot removes the archive, the "is archived" flag is set to false, and the reviewed flag to true.
+
+When reviewed is set, IABot no longer overwrites the DB entry with something new.
+
+Even on wiki.
+
+*Even if found on wiki, and there is no archive URL associated with it.
+
+Only users can then change that data.
+
+Or bot's using the API.
+
+I believe reviewed isn't indexed./
+
+IABot never forcibly changes archives, unless they are deemed invalid.
+
+This can be overridden in the config, by setting "touch_archives" to 1./
+
+Hope that makes sense. Now what do you need me to do? Jun 5th, 2017 Green_Cardamom 8:43 AM
+
+---
+
+Re: #2 if IABot can't force a change in wikitext the concept breaks down. The idea was IMP fixes the links in the database and then triggers a run of 
+IABot on pages those links exist. But if IABot doesn't force a change nothing happens the wikitext isn't fixed. It might for those with a {{dead link}} 
+(additions) but not those requiring delete or modify which is the majority (mostly modify). Cyberpower678 8:45 AM
+
+---
+
+I've been thinking about adding the option to pass configuration values to bot jobs. That would accomplish your goal.
+
+===Recipes===
+
+. Print URLs in iabget file
+    awk -i/home/adminuser/wmnim/wm2/library.awk '{match($0,/[}]archiveurl[=][^{]*[^{]/,dest); 
+      dest[0]=strip(subs("}archiveurl=","",dest[0])); if(length(dest[0]) > 0) print dest[0]}' iabget
+
+. Re-do entries in logskindeep with 000000 timestamps
+
+    awk '{print "./iabget -a searchurldata -p urlids=" $1 " >> /home/adminuser/wmnim/wm2/metaimp/dat/imp20180516france1skindeepmd.dat"}' /home/adminuser/wmnim/wm2/metaimp/dat/imp20180516france1skindeepmd.auth
+
+===Instructions===
+
+Consider disabling Runme.robots in medicinit.nim 
+
+If replacing WikiWix (ie. "france" in project name) monitor for non-changes and check why these were not modified by medic
+
+  ./monitor france
+
+----
+
+Download either a "md" or "a" .dat file to ~metaimp/dat
+
+  ./iabget -a searchurldata -p "hasarchive=1" > imp20170708md.dat
+  awk '{ if(NF==5) print $0 }' imp20170708md.dat > o ; mv o imp20170708md.dat
+
+  ./iabget -a searchurldata -p "livestate=dead|dying|unknown&isarchived=missing" > imp20170708a.dat
+  awk '{ if(NF==5){ if($3 ~ /dead|dying|whitelisted/) print $0 } }' imp20170708a.dat > o ; mv o imp20170708a.dat
+
+You may want to remove any previously processed records ie. auth.impdone.imp20170708a 
+
+ cd static
+ ls *.cfg
+ copy the last working cfg file to the projectid.cfg 
+ modify it
+
+Run IMP:
+
+  ./imp -c <filename.cfg> -r
+
+It will exit to shell when done. Check links as instructed then "exit" back. It will then ask to run API upload
+this is a break point. You can cntrl-C out and make changes to imp.cfg or imp.awk then restart. If you say "N" it will 
+keep processing the next batch without uploading results to API (recommend). You can then upload results in another 
+window while IMP continues processing the next batch.
+
+To upload API results manually run this:
+
+  ./project -e iabget -p <pid>
+
+and/or:
+
+  ./project -e iabget.error -p <pid>
+
+or with -f much faster:
+
+  ./project -f -e iabget.error -p <pid>

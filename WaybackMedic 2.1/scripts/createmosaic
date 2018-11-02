@@ -1,0 +1,101 @@
+
+       mkdir mosaic
+
+       set imptype = `pwd | awk '{c = split($0,a,"/"); split(a[c],b,"[.]"); if(b[1] ~ /^imp/ && b[1] ~ /a$/) print "1"; else print "0"}'`
+
+if( -e "wayrm") then
+       awk -F"----" '{print $2}' wayrm > badway.mosaic
+       split -l 50 badway.mosaic mosaic/badway.mosaic.
+endif
+if(-e "logbadstatusother") then
+       grep archive.is logbadstatusother | grep -v fixias | awk -F"----" '{print $2}' > badarchiveis.mosaic
+       split -l 50 badarchiveis.mosaic mosaic/badarchiveis.mosaic.
+       grep webcitation logbadstatusother | awk -F"----" '{print $2}' > badwebcite.mosaic
+       split -l 50 badwebcite.mosaic mosaic/badwebcite.mosaic.
+       cat logbadstatusother | grep -v webcit | grep -v archive.is | grep -v ' error ' | awk -F"----" '{print $2}' > badother.mosaic
+       split -l 50 badother.mosaic mosaic/badother.mosaic.
+       grep archive.is logbadstatusother | grep fixiasencode1.4 | awk -F"----" '{print $3}' > badfixias.mosaic
+       split -l 50 badfixias.mosaic mosaic/badfixias.mosaic.
+endif
+if(-e newiadate) then
+       if($imptype == "1") then
+         awk -F"----" '{print $3}' newiadate > badnewiadate.mosaic
+       else
+         awk -F"----" '{print $2}' newiadate > badnewiadate.mosaic
+       endif
+       split -l 50 badnewiadate.mosaic mosaic/badnewiadate.mosaic.
+endif
+if(-e newaltarch) then
+
+         # From 0SOFT step 8a. from Method: newaltarch no-cache short
+
+         mkdir mosaic
+         # Generate newaltarch.mosaic (not needed but to be safe)
+         awk -F"----" '{print $2}' newaltarch | awk '{print $3}' | sort | uniq > newaltarch.mosaic
+         # Generate newaltarchshort.mosaic
+         awk -F"----" '{print $2}' newaltarch | awk '{print $3}' | grep -v archive.is | grep -v archive-it | sort | uniq > newaltarchshort.mosaic
+         # Remove links in ~static/oklinks.bm (they were previously OK'd)
+         cp newaltarchshort.mosaic newaltarchshort.mosaic.orig
+         awk 'NR==FNR{a[$0];next} !($0 in a)' /home/adminuser/wmnim/wm2/static/oklinks.bm newaltarchshort.mosaic > o
+         mv o newaltarchshort.mosaic
+         # Split into 50-URL chunks for processing by Firefox
+         split -l 50 newaltarchshort.mosaic mosaic/newaltarchshort.mosaic.
+         # Print how many chunks ie. A -> Z
+         set t=`ls mosaic/newaltarchshort.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZ";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+         cp newaltarchshort.mosaic soft404.bm
+
+endif
+if(-e syslog) then
+       grep '17.a' syslog | awk -F"----" '{print $2}' > bad17a.mosaic
+       split -l 50 bad17a.mosaic mosaic/bad17a.mosaic.
+endif
+
+
+# Remove 0-length files
+if ( -e "badway.mosaic") then
+  if(`ls -as badway.mosaic | awk '{print $1}'` == 0) then   
+    rm badway.mosaic
+  endif
+endif
+
+if( -e "badnewiadate.mosaic") then
+  if(`ls -as badnewiadate.mosaic | awk '{print $1}'` == 0) then   
+    rm badnewiadate.mosaic 
+  endif
+endif
+
+if( -e "badfixias.mosaic") then
+  if(`ls -as badfixias.mosaic | awk '{print $1}'` == 0) then   
+    rm badfixias.mosaic
+  endif
+endif
+
+if( -e "badother.mosaic") then
+  if(`ls -as badother.mosaic | awk '{print $1}'` == 0) then   
+    rm badother.mosaic
+  endif
+endif
+
+if( -e "badwebcite.mosaic" ) then
+  if(`ls -as badwebcite.mosaic | awk '{print $1}'` == 0) then   
+    rm badwebcite.mosaic
+  endif
+endif
+
+if( -e "badarchiveis.mosaic" ) then
+  if(`ls -as badarchiveis.mosaic | awk '{print $1}'` == 0) then   
+    rm badarchiveis.mosaic
+  endif
+endif
+
+if( -e "newaltarchis.mosaic" ) then
+  if(`ls -as newaltarchis.mosaic | awk '{print $1}'` == 0) then   
+    rm newaltarchis.mosaic
+  endif
+endif
+
+if( -e "bad17a.mosaic" ) then
+  if(`ls -as bad17a.mosaic | awk '{print $1}'` == 0) then   
+    rm bad17a.mosaic
+  endif
+endif

@@ -1,0 +1,26 @@
+#!/usr/bin/tcsh -f
+
+if($1 == "france") then
+  awk -F\| '{print $1}' index > index.id
+  awk 'NR==FNR{a[$0];next} !($0 in a)' discovered index.id
+
+else if($1 == "syslog") then
+  set t = `awk '\\!s[$0]++' syslog | grep -v plaintext | grep archiveis_soft404 | awk '{s[$NF]++}END{for(i in s) t = t + s[i]; print t}'`
+  echo "archiveis_soft404 ("$t")"
+  awk '\!s[$0]++' syslog | grep -v plaintext | grep archiveis_soft404 | awk '{s[$NF]++}END{for(i in s)print " " i " = " s[i]}' | sort -n
+
+  set t = `awk '\\!s[$0]++' syslog | grep -v plaintext | grep isredirsoft404 | awk '{s[$NF]++}END{for(i in s) t = t + s[i]; print t}'`
+  echo ""
+  echo "isredirsoft404 ("$t")"
+  awk '\!s[$0]++' syslog | grep -v plaintext | grep isredirsoft404 | awk '{s[$NF]++}END{for(i in s)print " " i " = " s[i]}' | sort -n
+
+else if(-e auth.critical && -e index.temp) then
+  wc -l wayrm newaltarch newiadate newialink logskindeep ; echo "---"; wc -l discovered ; echo "---"; wc -l index.temp auth.critical | grep -v total ; echo "---"; wc -l newaltarch.orig newiadate.orig newialink.orig logskindeep.orig
+
+else if(-e index.temp) then
+  wc -l wayrm newaltarch newiadate newialink logskindeep ; echo "---"; wc -l discovered ; echo "---"; wc -l index.temp ; echo "---"; wc -l newaltarch newiadate newialink logskindeep
+
+else 
+  wc -l wayrm newaltarch newiadate logskindeep ; echo "---"; wc -l discovered ; echo "---"; wc -l newaltarch newiadate logskindeep
+
+endif

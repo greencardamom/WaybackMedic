@@ -1,0 +1,76 @@
+#!/usr/bin/tcsh -f
+
+if(-e "auth.critical") then
+  mv auth.critical auth.critical.orig
+endif
+
+touch auth.critical
+
+if(! -e "run1") then
+  mkdir run1
+  cp * run1
+endif
+
+if(-e "auth.critical") then
+  awk -F"----" 'BEGINFILE{if (ERRNO) nextfile} {print $1}' critical >> auth.critical
+endif
+
+set imptype = `pwd | awk '{c = split($0,a,"/"); split(a[c],b,"[.]"); if(b[1] ~ /^imp/ && b[1] ~ /a$/) print "1"; else print "0"}'`
+
+set isfrance = `pwd | awk '{c = split($0,a,"/"); split(a[c],b,"[.]"); if(b[1] ~ /^imp/ && b[1] ~ /france/) print "1"; else print "0"}'`
+
+if(-e "wayrm") then
+  if($imptype == "0") then   # Don't rerun these if imp type is "Add" (ie. 1)
+    cp wayrm wayrm.orig
+    awk -F"----" '{print $1}' wayrm >> auth.critical
+  endif
+endif
+
+if(-e "logbadstatusother") then
+  cp logbadstatusother logbadstatusother.orig
+  grep archive.is logbadstatusother | grep -v logbadstatusother1.2 | awk -F"----" '{print $1}' >> auth.critical
+  grep -v archive.is logbadstatusother | awk -F"----" '{print $1}' >> auth.critical
+endif  
+
+if(-e "newiadate") then
+  if($imptype == "0" && isfrance == "0") then   # Don't rerun these if imp type is "Add", or if "france" (ie. wikiwix replacement)
+    cp newiadate newiadate.orig
+    awk -F"----" '{print $1}' newiadate >> auth.critical
+  endif
+endif
+
+if(-e "newaltarch") then
+  if($imptype == "0") then   # Don't rerun these if imp type is "Add"
+    cp newaltarch newaltarch.orig
+    grep -vE "189901|197001" newaltarch | awk -F"----" '{print $1}' >> auth.critical
+  endif
+endif
+
+if(-e "bogusapi") then
+  grep "Save this URL on the Wayback Machine" bogusapi | awk -F"----" '{print $1}' >> auth.critical
+endif
+
+if(-e "syslog") then
+  grep "SIGNAL 4" syslog | awk -F"----" '{print $1}' >> auth.critical
+  grep -F loading.gif syslog | awk -F"----" '{print $1}' >> auth.critical
+endif
+
+if(-e "timeout") then
+  grep queryapi timeout | awk -F"----" '{print $1}' >> auth.critical
+endif
+
+if(-e "wayrm" && -e "bogusapi") then
+  if($imptype == "0") then   # Don't rerun these if imp type is "Add"
+    awk -F"----" '/ A1/{print "grep \"" $1 "\" wayrm"}' bogusapi | tcsh | awk -F"----" '{print $1}' >> auth.critical
+  endif
+endif
+
+awk 'BEGINFILE{if (ERRNO) nextfile} ! s[$0]++' auth.critical > o; mv o auth.critical
+
+if(-e "critical") then
+  mv critical critical.orig
+endif
+if(-e "timeout") then
+  mv timeout timeout.orig
+endif
+

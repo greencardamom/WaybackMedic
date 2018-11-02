@@ -1,0 +1,183 @@
+== Notes for running iab.awk ==
+
+Run in debug mode on a single file:
+
+	./iab.awk -g -p iab20180226-20180409.100001-111669 -d -f logbadstatusother
+
+Grep for 4 types of results in 5 types of logs: wayrm, logbadstatusother, newialink, newiadate, newaltarch
+
+	./iab.awk -g -p iab20180226-20180409.100001-111669 -d -f logbadstatusother | grep FOUND
+	./iab.awk -g -p iab20180226-20180409.100001-111669 -d -f logbadstatusother | grep MISS
+	./iab.awk -g -p iab20180226-20180409.100001-111669 -d -f logbadstatusother | grep SKIP
+	./iab.awk -g -p iab20180226-20180409.100001-111669 -d -f logbadstatusother | grep UNKNOWN
+
+The total amount of these four types should equal the length of 'logbadstatusother'.
+Look for garbage data and either find ways to improve algorithm or update IAB DB manually.
+
+FOUND: all is good, found a match in the IAB DB. Majority of cases.
+
+MISS: Found a match in the DB but didn't make it past the algorithm. This shouldn't happen.
+      . Except with logbadstatusother is normal (see noted in code).
+      . Except with wayrm when another process (IMP etc) changed the IAB DB to a different archive
+        or even IABot found a different archive somewhere else. IOW if the the archive in IAB DB 
+        is different from the archive deleted in wikitext, leave it alone (don't delete the IAB DB)
+
+SKIP: Found a match in DB but it duplicates what's already there so skipping it. SKIPs are normal.
+
+UNKNOWN: Link can't be found in DB. Generally, there should be no UNKNOWN. However, they still 
+         appear due to editors adding new links in between when IABot and GreenC bot ran on the 
+         article. Thus, there can be cites that GreenC bot is aware of that IABot is not. This 
+         results in iab.awk being unable to find the cite in the IAB database and an UNKNOWN 
+         condition. It can also happen if the link was previously under {{cbignore}} in which 
+         case IABot DB will have no record of it.
+
+         Still, spot-check to make sure iab.awk isn't making an internal error. Do this for each 
+         source URL that is UNKNOWN:
+
+	     zcat iabwikdb.gz | grep -i '<url>'
+
+         If it shows up there might be a problem with the algorithms needing adjustment.
+
+
+----
+To process entire project:
+
+  Run command from meta directory, copypaste and execute from main directory:
+
+  ls -tr | grep iab20171129-20180120 | grep -v auth | awk '{printf "./iab -p " $1 " -g; ./iab -p " $1 " -a; "}'
+
+  After done. Run and execute from meta directory:
+
+  ls -tr | grep iab20171129-20180120 | grep -v auth | awk '{printf "./setdate " $1 " ;"}'
+
+----
+
+WikiWix bot edits as Wikiwix-bot see interface logs
+
+Weird Date problems
+
+Case 1: 
+
+  WikiWix reports a snapshot date of 2010 for http://ausiellofiles.ew.com pages
+  Compare with Wayback snapshots from same time period:
+
+  http://archive.wikiwix.com/cache/20100415054945/http://ausiellofiles.ew.com/2008/09/04/lost-casts-zule/
+  https://web.archive.org/web/20100417071826/http://ausiellofiles.ew.com/2010/04/14/glee-terri-finn/
+  http://archive.wikiwix.com/cache/20100526094203/http://ausiellofiles.ew.com/2010/04/14/glee-terri-finn/
+  https://web.archive.org/web/20100803210121/http://ausiellofiles.ew.com/2008/09/04/lost-casts-zule/
+
+    15 April 2010 - site deleted (WikiWix)
+    17 April 2010 - site live (Wayback)
+    26 May 2010   - site deleted (WikiWix)
+    3 Aug 2010    - site live (Wayback)  
+
+    Makes no sense..
+
+  According to archive.is the "site deleted" page didn't appear until 2016:
+
+    http://archive.is/ausiellofiles.ew.com
+
+  Actual snapshot date: 2016 or later, not 2010
+
+Case 2: 
+
+  https://web.archive.org/web/20100215070459/http://www.cedfog.org/Documentos/Tradicion/malacatancito.pdf
+  http://archive.wikiwix.com/cache/20100215000000/http://cedfog.org/Documentos/Tradicion/malacatancito.pdf
+
+  WikiWix using same snapshot date as Wayback. 
+
+Case 3:
+
+  http://archive.wikiwix.com/cache/20070301071118/http://danielpearl.org/
+
+  Snapshot from 2007 contains content dated 2015
+
+  Actual snapshot date: 2015 or later, not 2007
+
+Case 4:
+
+  site dead - 27 August 2011
+  http://archive.wikiwix.com/cache/20110827204445/http://allafricagamesmaputo.com/index.php?option=com_content&view=article&id=165&Itemid=200
+  site alive - 3 September 2011
+  https://web.archive.org/web/20110903182916/http://allafricagamesmaputo.com/index.php?option=com_content&view=article&id=165&Itemid=200
+
+Case 5:
+
+  http://archive.wikiwix.com/cache/20150225205441/http://animaldiversity.org/accounts/Lepidocephalichthys_hasselti/classification/
+   bottom of page: "To cite this page: Myers, P., R. Espinosa, C. S. Parr, T. Jones, G. S. Hammond, and T. A. Dewey. 2018"
+  https://web.archive.org/web/20150225171518/http://animaldiversity.org/accounts/Lepidocephalichthys_hasselti/classification/
+   bottom of page: "To cite this page: Myers, P., R. Espinosa, C. S. Parr, T. Jones, G. S. Hammond, and T. A. Dewey. 2015"
+
+  Archived on the same day in 2015, but WikiWik has a "2018" citation.
+
+Case 6:
+
+  http://archive.wikiwix.com/cache/20110711100657/http://bataviase.co.id/node/269171
+
+  Page is dated 2016
+
+Case 7:
+
+  http://archive.wikiwix.com/cache/20100226014631/http://callisto10.ggimg.com/doc/LT/WrapPDF%3DcontentSet%3DLT%3DrecordID%3D0FFO-1982-MAR12-011-F.pdf
+
+  Error in archive reveals they are downloading content from Wayback.. using an earlier date than the Wayback snapshot
+
+Case 8:
+
+  http://archive.wikiwix.com/cache/20171020130432/https://books.google.fr/books?ei=WGfAUZY_h4KFB4WYgBg&hl=fr&id=PVQRAQAAMAAJ&dq=alphonse+p%C3%A9naud+balan%C3%A7oire&q=p%C3%A9naud+balan%C3%A7oire
+  
+  Odd snapshots suggest wider data corruption due to script errors
+
+Case 9:
+
+  Badly formated pages
+
+  http://archive.wikiwix.com/cache/20151212214252/ftp://ftp.atdd.noaa.gov/pub/GCOS/WMO-Normals/TABLES/REG_VI/RE/27595.TXT
+  ftp://ftp.atdd.noaa.gov/pub/GCOS/WMO-Normals/TABLES/REG_VI/RE/27595.TXT
+
+
+---
+
+To search French Wiki via API:
+  ./iabget -a searchurldata "hasarchive=0" > test.dat
+  awk -f ww.awk
+
+current search method via API: best method?
+  ./wikigetww.awk -A 'insource:"//haiku-os.org/" insource:/[\[^=( -;.:\|](https?|ftp)[:][\/][\/]haiku-os.org[\/][ \|\]$]/i' -lfr -d
+
+  Need to account for URLs buried in achive URLs and 
+
+----                                                      
+
+To search via grep (wwg.awk)
+
+Download French Wiki external links:
+
+ # Download dump of external URLs
+  cd /home/adminuser/wmnim/wm2/metaimp/dat/france-wwg
+  wget -q -O- 'https://dumps.wikimedia.org/frwiki/20180501/frwiki-20180501-externallinks.sql.gz' > frwiki-20180501-externallinks.sql.gz 
+  gunzip frwiki-20180501-externallinks.sql.gz  
+
+ # extract URLs, break down into separate files to make searching faster
+  grep -oE "['](http|ftp)[^']*[']" frwiki-20180501-externallinks.sql | awk '{gsub("^\x27|\x27$","",$0); print $0}' | grep -v "\./" | awk -v d="frwiki-20180501-externallinks" '{match($0,/^(https?|ftp)[:]\/\/[a-z A-Z 0-9]/,dest); print $0 >> d "-" substr(dest[0],length(dest[0]),1) ".txt"}'
+
+ # break "w" and "t" down further they are large
+  awk -v d="frwiki-20180501-externallinks" '{match($0,/^(https?|ftp)[:]\/\/[^.]+[.][a-z A-Z 0-9]/,dest); print $0 >> d "-t-" substr(dest[0],length(dest[0]),1) ".txt" }' frwiki-20180501-externallinks-t.txt
+  awk -v d="frwiki-20180501-externallinks" '{match($0,/^(https?|ftp)[:]\/\/[^.]+[.][a-z A-Z 0-9]/,dest); print $0 >> d "-w-" substr(dest[0],length(dest[0]),1) ".txt" }' frwiki-20180501-externallinks-w.txt
+
+
+To search via API (ww.awk)
+
+  ./iabget -a searchurldata -p "hasarchive=1" > frwiki-20180501-externallinks.dat
+  grep ' https://archive.wikiwix.com' > o
+  mv frwiki-20180501-externallinks.dat frwiki-20180501-externallinks.dat.ORIG
+  mv o frwiki-20180501-externallinks.dat
+  cp frwiki-20180501-externallinks.dat france-ww
+  cd france-ww
+ # Split into 10 files (batches)
+  split -a1 -d -n 10 imp20180516md.dat imp20180516md.dat.
+ # adjust ww.awk parameters to process 1 or more batchs (up to 10)
+ # each batch will take about 15 hours to complete
+ # After each batch is completed, copy to dat directory in prep for IMP with new project ID: france0md, france1md.. france9md
+  cp imp20180516md.dat.0.available /home/adminuser/wmnim/wm2/metaimp/dat/imp20180516france0md.dat 
+ # Run IMP per procedures in 0IMP 

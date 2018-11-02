@@ -1,0 +1,445 @@
+# The MIT License (MIT)
+#
+# Copyright (c) 2016-2018 by User:GreenC (at en.wikipedia.org)
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+== Overview ==
+
+The below are script commands cut and pasted in sequence. Some are optional. Some are run from the meta directory, others from the main WaybackMedic directory. If from the meta directory it will say "(meta)" otherwise assume from the main directory.
+
+* Step A defines the total number of articles typically 100,000 to 300,000 representing articles touched by IABot during a few months period.
+
+* Step B -> C is a cycle repeated for each project ID. A project is typically 10,000 to 20,000 articles and takes 24hrs to complete.
+
+I usually wait for IABot to edit about 100,000 articles and have project sizes of about 20,000 so it takes 5 days to complete (5 cycles of step B->C)
+
+Ideally every step is done, but in practice those marked "optional" can safely be skipped.
+
+==Instructions==
+
+A. Make a list of uniq articles touched by IABot across a date range. 
+
+    ./wikiget -u "InternetArchiveBot" -s "20151231" -e "20160304" > meta/iab20151231-20160304.auth
+
+    Only needed once.
+
+----
+
+B. Run medic
+
+1. Create new project id (-p <pid>) - get a chunk of articles to process typically 10,000 to 20,000 during production (smaller for testing)
+
+    ./projectm -c -p cb20151231-20160304.0001-1000
+
+2. Run medic in parallel
+
+   * Run parallel 
+     ./runmedic <pid> auth
+        eg. parallel -a meta/cb20151231-20160304.0001-1000/auth -r --delay 2 --trim lr -k -j 18 ./drivermedic -p cb20151231-20160304.0001-1000 -n {} 
+
+   * Optional: while it's running, run this in another window to monitor, if it's a long run:
+     ./parallelwatch -t 900 -p <pid> 
+
+       -t 900 is a 15 minute update
+
+3. Check and fix wikipedia data errors that can't be fixed by bot
+
+   * (optional) Verify all logged changes are reflected in the discovered file. This will help uncover bugs in medic
+
+     (meta) awk -F"----" '{if($0 !~ /[ ]error[ ]|[ ]warning[ ]/) print gensub(/^[[:space:]]+|[[:space:]]+$/,"","g",$1)}' log* new* wayrm | sort | uniq | wc ; wc discovered
+            
+            if the counts don't match run this to find problem articles:
+            awk -F"----" '{if($0 !~ /[ ]error[ ]|[ ]warning[ ]/) print gensub(/^[[:space:]]+|[[:space:]]+$/,"","g",$1)}' log* new* wayrm | sort | uniq > o
+            awk 'NR==FNR{a[$0];next} !($0 in a)' discovered o
+
+   * Check for errors .. manually fix problems in the wikitext online
+ 
+     (meta) grep ' error ' * | grep -v Documentation
+            # Fix these
+     (meta) grep ' warning ' * | grep -v Documentation
+            # Fix these
+     (meta) edit log404 and search on "error"  (grep -i error logiats log404)
+            # Fix those
+     (meta) edit logiats and search on "error"
+            # Fix those
+     (meta) cat logembway
+            # Check these - often something went wrong medic couldn't fix
+     (meta) cat syntaxerror
+            # URLs often contain garbage data such as " fixed in the wikisource
+     (meta) cat logdoubleurl
+            # Check for malformed URLs
+     (meta) cat logpctmagic
+            # look for and fix mistakes such as {{!}}access-date or {{!}publisher etc..
+     (meta) cat log3slash
+            # fix any needing it
+     (meta) cat logiats | grep '(6)'
+            # look for malformed http:// entries
+     (meta) if(-e waydeep) cat waydeep
+            # keep eye on these - might need to remove code block if none show up
+     (meta) grep emtem syslog
+            # keep eye on these for info purposes - consider ways to make changes
+     (meta) grep 'add missing url (' syslog
+            # check diffs for cases where url should not be added (cite tweet, cite web/chapter-url, cite map, etc)
+     (meta) if(-e logdoublewebarchive) cat logdoublewebarchive
+            # manual fix required
+     (meta) grep botwar logwebcitlong
+            # look for bot wars. Data is cached in the module directory warfile.log and will be removed the first time deletenamewrapper is run.
+            # this grep is your first and only warning!
+     (meta) grep longmismatch logwebcitlong | grep -E '[}|\||{|<|>|]|]|\[|"|'"'"
+            # look for problems with encoding
+     (meta) grep longmismatch logwebcitlong | grep -Ev '[}|\||{|<|>|]|]|\[|"|'"'"
+            # look for unknown problems
+     (meta) grep fixencodebug3 syslog
+            # check diff, fix in-wiki and add {{cbignore}} to keep IAB from undoing
+     (meta) grep fixcommentarchive syslog
+            # look at diffs for problems / see also the first "error" step why those didn't get fixed
+     (meta) grep 'A6[.]7' bogusapi | grep -vE ' A6.7.1{1}$'
+            # look at diffs for malformed URLs caused by waytree_trailgarb()
+     (meta) grep 'unrecognized archive service' syslog
+            # check for new archive service types that are currently not codified. Add them to the system ("grep newweb *.nim")
+            # and open a Phab ticket to add them to IABot
+     (meta) grep 'FOUND. Alt archive' syslog
+            # check these redirect altarchive URLs work. 
+            # if too many are bad, change waytree() and disallow from being accepted.
+     (meta) awk -F"----" -i library.awk -i atools.awk '{f=urlElement(urlurl(strip($2)), "netloc"); s=urlElement(urlurl(strip($3)),"netloc"); 
+                                                        if(f != s && f !~ /webcit/) print strip($2) " = " strip($3)}' logwebcitlong | sort | uniq
+            # Check for webcite API bug and update webcitlong.awk around line # 249
+
+   * Backup files
+
+     (meta) cp index index.temp.run1 ; mkdir run1 ; cp * run1
+
+4. Re-run critical, deleted links, etc.. (see criticalrun script)
+
+   (meta) 
+          mv /home/adminuser/wmnim/wm2/redirects .
+          tcsh criticalrun; wc -l auth.critical
+          ./deletenamewrapper critical ; bell
+
+   # Re-run using auth.critical as input
+
+          ./runmedic <pid> auth.critical
+          * If aborted, re-assemble index - See first item in step 3. for instructions
+
+   (meta)
+          mv redirects redirects.critical; mv /home/adminuser/wmnim/wm2/redirects redirects
+          wc wayrm.orig logbadstatusother.orig newiadate.orig newaltarch.orig; echo "----"; wc wayrm logbadstatusother newiadate newaltarch
+          wc -l critical
+
+5. Check wayrm and lodbadstatusother for false positive 
+
+   Scroll through wayrm, look at the end of URLs for problems for example:
+
+          ..html{{dead
+          ..html[[stuff
+          ..html|stuff
+          ..htmll
+
+   Check any spurious trailing characters:
+
+   (meta) awk '{c=split($0,a,""); if(a[c] ~ /[.]|[,]|[-]|[:]|[;]|[\[]{2}/) print $0; if($0 ~ /[[]{2}/) print $0}' wayrm
+
+   Check wayrm for any remaining A1's that need to be checked manually:
+
+    awk -F"----" '/ A1/{print "grep \"" $1 "\" wayrm"}' bogusapi | tcsh | awk -F"----" '{print "grep \"" $1 "\" auth.critical"}' | tcsh | 
+      awk '{print "grep \"" $0 "\" wayrm"}' | tcsh
+
+6. Optional: Re-run deleted links
+
+   These links were already processed in Step 5. but sometimes you may want to re-run them like if archive.org is not running well
+
+   (meta) 
+          mv critical critical.orig
+          cp wayrm wayrm.orig; cp logbadstatusother logbadstatusother.orig
+          awk -F"----" '{print $1}' wayrm.orig > auth.wayrm
+          grep archive.is logbadstatusother | grep -Ev "logbadstatusother[123][.][28]" | awk -F"----" '{print $1}' >> auth.wayrm
+          grep -v archive.is logbadstatusother | awk -F"----" '{print $1}' >> auth.wayrm
+          sort auth.wayrm | uniq > o; mv o auth.wayrm
+          wc -l auth.wayrm ; ./deletenamewrapper wayrm ; bell
+
+        * ./runmedic <pid> auth.wayrm
+
+          mv redirects redirects.critical; mv /home/adminuser/wmnim/wm2/redirects redirects
+          wc wayrm.orig logbadstatusother.orig newaltarch.orig newiadate.orig; echo "----"; wc wayrm logbadstatusother newaltarch newiadate
+          wc -l critical
+
+          If critical > 0:
+
+            awk -F"----" '{print $1}' critical > auth.critical 
+            ./deletenamewrapper critical ; wc -l auth.critical ; bell
+
+          * ./runmedic <pid> auth.critical
+
+            mv redirects redirects.orig; mv /home/adminuser/wmnim/wm2/redirects redirects
+            wc wayrm.orig logbadstatusother.orig; echo "----"; wc wayrm logbadstatusother
+            wc -l critical
+
+          if critical > 0 repeat loop
+
+7. Fine-tune code by checking deleted/modified links and reason why
+
+   Create .mosaic files 
+
+       mkdir mosaic
+       awk -F"----" '{print $2}' wayrm > badway.mosaic
+       split -l 50 badway.mosaic mosaic/badway.mosaic.
+       grep archive.is logbadstatusother | grep -v fixias | awk -F"----" '{print $2}' > badarchiveis.mosaic
+       split -l 50 badarchiveis.mosaic mosaic/badarchiveis.mosaic.
+       grep webcitation logbadstatusother | awk -F"----" '{print $2}' > badwebcite.mosaic
+       split -l 50 badwebcite.mosaic mosaic/badwebcite.mosaic.
+       cat logbadstatusother | grep -v webcit | grep -v archive.is | grep -v ' error ' | awk -F"----" '{print $2}' > badother.mosaic
+       split -l 50 badother.mosaic mosaic/badother.mosaic.
+       awk -F"----" '{print $2}' newiadate > badnewiadate.mosaic
+       split -l 50 badnewiadate.mosaic mosaic/badnewiadate.mosaic.
+       grep archive.is logbadstatusother | grep fixiasencode1.4 | awk -F"----" '{print $3}' > badfixias.mosaic
+       split -l 50 badfixias.mosaic mosaic/badfixias.mosaic.
+
+   Look for false postives of archive.org links
+
+       firefox `awk '$0' mosaic/badway.mosaic.aa`
+
+   Look for false postives of archive.is links
+
+       firefox `awk '$0' mosaic/badarchiveis.mosaic.aa`
+
+       Fine-tune proc archiveis_soft404() in medicapi.nim
+
+   Look for false postives of webcitation.org links
+
+       firefox `awk '$0' mosaic/badwebcite.mosaic.aa`
+
+   Check the rest:
+
+       firefox `awk '$0' mosaic/badother.mosaic.aa`
+
+   Optional: Check conversion of archive.is encoding (all here should work)
+
+       firefox `awk '$0' mosaic/badfixias.mosaic.aa`
+
+   Optional: Look for unexplained Wayback date changes (all here should not work):
+
+       firefox `awk '$0' mosaic/badnewiadate.mosaic.aa`
+
+8. Check newaltarch for soft-404s
+
+         NOTE: Changes here should be synced with ~/scripts/createmosaic (for IMP)
+ 
+         see 0SOFT for other Methods
+
+      8a.
+
+         mkdir mosaic
+         # Generate newaltarch.mosaic
+         awk -F"----" '{print $2}' newaltarch | awk '{print $3}' | sort | uniq > newaltarchshort.mosaic;sleep 1
+         # Remove links in ~static/oklinks.bm (they were previously OKd)
+         cp newaltarchshort.mosaic newaltarchshort.mosaic.orig
+         awk 'NR==FNR{a[$0];next} !($0 in a)' /home/adminuser/wmnim/wm2/static/oklinks.bm newaltarchshort.mosaic > o;sleep 1
+         mv o newaltarchshort.mosaic;sleep 1
+         # Split into 50-URL chunks for processing by Firefox
+         split -l 50 newaltarchshort.mosaic mosaic/newaltarchshort.mosaic. ; sleep 1
+         # Print how many chunks ie. A to Z
+         set t=`ls mosaic/newaltarchshort.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZabcd";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+         # cp newaltarchshort.mosaic soft404.bm
+
+       8b.
+
+         Process files sequentially (.mosaic.aa / .mosaic.ab / .mosaic.ac etc)
+           firefox `awk '$0' mosaic/newaltarchshort.mosaic.aa`
+
+         * For each firefox session, close tabs of archives that are working ie. not soft-404
+         * When only bad tabs remains, bookmark all tabs (right-click on tab, "Bookmark all tabs"). Save as "soft404" boomark file
+         * When all .mosaic.ax have been processed. right-click on soft404 bookmark file and choose "copy"
+         * Open file "soft404.bm" in meta directory and paste the list of URLs
+
+       8c.
+
+         # Verify a soft404.bm file exists
+         awk -ireadfile 'BEGIN{f=readfile("soft404.bm");if(length(f)<1){system("bell");printf("No soft404.bm Press c-C");system("sleep 1000")}}'
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm > o; mv o soft404.bm
+         # Update ~static/soft404.bm
+         cp /home/adminuser/wmnim/wm2/static/soft404.bm /home/adminuser/wmnim/wm2/static/soft404.bm.bak
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm >> /home/adminuser/wmnim/wm2/static/soft404.bm
+
+       # Only if manually checked everything - not for IMP
+         # Update ~static/newaltarch.mosaic and oklinks.bm
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;cp newaltarch.mosaic newaltarch.mosaic.bak;cd "$p"
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;cp oklinks.bm oklinks.bm.bak;cd "$p"
+         cat /home/adminuser/wmnim/wm2/static/newaltarch.mosaic newaltarchshort.mosaic | sort | uniq > /home/adminuser/wmnim/wm2/static/o;sleep 1
+         mv /home/adminuser/wmnim/wm2/static/o /home/adminuser/wmnim/wm2/static/newaltarch.mosaic;sleep 1
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;awk 'NR==FNR{a[$0];next} !($0 in a)' soft404.bm newaltarch.mosaic > oklinks.bm;cd "$p"
+
+         # Create auth.bm 
+         awk -iatools -ilibrary 'BEGIN{for(i=1;i<=splitn("soft404.bm",a,i);i++) { for(k=1;k<=splitn("newaltarch",b,k);k++) {split(b[k],z,"----"); 
+            if(urlequal(a[i],splitx(z[2]," ",3))){print z[1]} } } }' | sort | uniq > auth.bm ; bell
+
+         # awk '{if($0 ~ /^http/){print "grep \"" $0 "\" newaltarch"}}' soft404.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq > auth.bm
+         # awk '{if($0 ~ /^http/){print "grep \"" $0 "\" allwikiwix"}}' soft404.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq >> auth.bm
+
+         # Update and delete logs
+         cp newaltarch newaltarch.origbm ;cp syslog syslog.origbm; wc auth.bm
+         # ./deletenamewrapimp bm
+         ./deletenamewrapper bm
+
+         runmedic <pid> auth.bm
+
+         # Show stats
+         set aa=`sed -n '$=' soft404.bm`;set a=`sed -n '$=' newaltarch.origbm`;set b=`sed -n '$=' newaltarch`;set c=`c "$b"-"$a"`
+         set d=`grep -c '(1) in soft404.bm' syslog.origbm`;set e=`grep -c '(1) in soft404.bm' syslog`;set f=`c "$e"-"$d"`
+         echo "\nSoft404: ""$aa""\n\nNewaltarch\n----\norig=""$a""\nnew=""$b""\ntot=""$c""\n\nSoft404 hits\n----\norig=""$d""\nnew=""$e""\ntot=""$f""\n"
+         set g=`awk -F"----" '/deadcount/{i2=i2+$2;i3=i3+$3}END{print i3/i2}' syslog`;echo "\n% dead-links saved: ""$g"
+
+         ----------------------  Internet Archive (highly optional) ------------------------
+
+         awk -F"----" '{print $2}' newialink | sort | uniq > newialink.mosaic;sleep 1
+         split -l 50 newialink.mosaic mosaic/newialink.mosaic.;sleep 1
+         set t=`ls mosaic/newialink.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZ";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+
+         Process files sequentially:
+           firefox `awk '$0' mosaic/newialink.mosaic.aa`
+           firefox `awk '$0' mosaic/newialink.mosaic.ab`
+         etc..
+
+         Save file as "soft404i.bm"
+
+         awk '{if($0 ~ /^http/){print $0}}' soft404i.bm > o; mv o soft404i.bm
+         awk '{if($0 ~ /^http/){print $0}}' soft404i.bm >> /home/adminuser/wmnim/wm2/static/soft404i.bm
+         awk '{if($0 ~ /^http/){print "grep \"" $0 "\" newialink"}}' soft404i.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq >> auth.bmi
+         cp newialink newialink.origbm ; wc auth.bmi
+         ./deletenamewrapper bmi
+
+         runmedic <pid> auth.bmi
+
+         wc newialink.origbm; echo "----"; wc newialink
+
+______________________________
+
+C. Run APIs - push changes to Wikipedia and IABot database
+ 
+1. Run Wikipedia API (first)
+
+   (meta) cp discovered discovered.orig
+   ./push2wiki -p <pid> -d0 
+   * when done discovered should be 0-length or missing
+   * IF discovered.error exists:
+     (meta) mv discovered.error discovered
+     ./push2wiki -p <pid> -d0 
+     * repeat until no error
+
+2-4. (meta) ./push
+     Or, follow manual steps below. "push" automates steps 2-4.
+
+2. Re-run articles that changed (only run if auth.demon exist)
+   
+   (meta) wc -l auth.demon; ./deletenamewrapper demon; bell
+          mv index.temp index.temp.rerunX ; mv timeout timeout.rerunX; mv critical critical.rerunX
+   ./runmedic <pid> auth.demon
+   * If runmedic was aborted, see Step 3. for instructions to recover index
+
+   # Cleanup:
+   (meta) mv index.temp index.demon.runX; mv redirects redirects.demon.runX; mv /home/adminuser/wmnim/wm2/redirects redirects
+   * If a new timeout or critical shows up:
+      mv critical critical.orig
+      cat critical.orig | awk -F"----" '{print $1}' > auth.timeout
+      ./deletenamewrapper timeout; bell
+    * ./runmedic <pid> auth.timeout
+
+3. Run API (second, third, ..)
+
+   (meta) cp discovered discovered.demon.runX (1..X)
+          cp discovered.error discovered.error.runX (1..X)
+          mv auth.demon auth.demon.runX (1..X)
+   ./push2wiki -p <pid> -d0 -b1
+   * IF discovered.error exists:
+     (see steps in C.1)
+
+4. Repeat steps C.2-4 until no more show up in auth.demon 
+
+5. Run iab.awk to push changes to IABot database 
+
+  Process entire project after all sub-project id's are done
+
+    Run this command from meta root directory, copypaste output and execute it while in main directory:
+
+      ls -tr | grep iab20171129-20180120 | grep -v auth | awk '{printf "./iab -p " $1 " -g; ./iab -p " $1 " -a; "}END{print ""}'
+
+    After done. Run and execute from meta root directory:
+
+      ls -tr | grep iab20171129-20180120 | grep -v auth | awk '{printf "./setdate " $1 " ;"}END{print ""}'
+
+   More info in 0IAB
+
+______________________________
+
+6. Manual cleanup - all optional
+
+ 6.1. Find and remove/edit zombie links. These are mostly because limitation
+      of regex when there is more than 1 copy of a string it doesn't know which to delete/modify. 
+      Software bug leads show up here.
+
+         ./bug -p cb20151231-20160304.00001-10000 -z  >  meta/cb20151231-20160304.00001-10000/zombielinks
+
+
+ 6.2  Fixembway errors
+
+         (meta) grep -E "fixembway[4567]" logembway
+
+      For fixembway4,6,7:
+
+         These were fixed automatically, but check why they occuring:
+           1. The template is unrecognized by IABot and should be added to its configuration page:
+                    https://en.wikipedia.org/wiki/User:InternetArchiveBot/Dead-links.js
+                    The "cite templates" section is for templates that support url, accessdate, archivedate, and archiveurl parameters
+           2. There is a bug in IABot parsing the template and should be reported at Phab
+          
+      For fixembway5:
+
+         These couldn't be fix automatically. Check article for double {{cite}} insertions and fix manually
+
+
+ 6.3  Search for empty url= arguments in {{webarchive}}
+
+         (meta) grep -E "webarchive1|wayback1" logemptyarch
+
+
+ 6.4  Search waydeep for unusual cases and verify they work (in particular 8.11 double redirects)
+
+         (meta) grep -v "Step 8.13" waydeep | grep -v "Step 8.10"
+
+
+
+ 6.5 Check archive.is accepts and try to improve filter rules
+ 
+         mkdir mosaic
+ 	 grep archive.is newaltarch | awk -F"----" '{print $2}' | awk '{print $3}' | sort | uniq > newaltarchis.mosaic
+         split -l 50 newaltarchis.mosaic mosaic/newaltarchis.mosaic.
+         firefox `awk '$0' mosaic/newaltarchis.mosaic.aa`
+
+ 6.5 Check archive.is soft404 rejects and try to improve filter rules
+
+
+         grep archiveis_soft404 syslog | awk -F"----" '{print $2}' | awk '\!s[$0]++' > is404.mosaic
+         grep soft404 syslog | grep -v archiveis_soft404 | awk -F"----" '{print $3}' | awk '\!s[$0]++' >> is404.mosaic
+         split -l 50 is404.mosaic mosaic/is404.mosaic.
+         firefox `awk '$0' mosaic/is404.mosaic.aa`
+
+
+_________________________________
+
+

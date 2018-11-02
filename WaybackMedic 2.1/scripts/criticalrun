@@ -1,0 +1,26 @@
+if(-e "auth.critical") then
+  mv auth.critical auth.critical.orig
+endif
+awk -F" : #" 'BEGINFILE{if (ERRNO) nextfile}{s = $2;gsub(/[Rr][Ee][Dd][Ii][Rr][Ee][Cc][Tt][ ]{0,}\[\[/,"",s); p = substr(s, 1, length(s) - 1); if(p ~ "#") print substr(p, 1, index(p, "#") - 1); else print p}' redirects > auth.critical
+awk -F" : #" 'BEGINFILE{if (ERRNO) nextfile}{s = $1; gsub(/\(|\)|\?|\*/,"\\\\&", s); gsub(/'"'"'/, "'"'"'\"'"'"'\"'"'"'", s ); printf("grep -Ev %c^%s%c auth > o ; mv o auth\n",0x27,s,0x27)}' redirects | tcsh
+cat auth.critical >> auth
+awk -F"----" 'BEGINFILE{if (ERRNO) nextfile} {print $1}' critical >> auth.critical
+
+cp wayrm wayrm.orig; cp logbadstatusother logbadstatusother.orig; cp newiadate newiadate.orig; cp newaltarch newaltarch.orig
+cp newialink newialink.orig; cp logskindeep logskindeep.orig
+grep "SIGNAL 4" syslog | awk -F"----" '{print $1}' >> auth.critical
+grep -F loading.gif syslog | awk -F"----" '{print $1}' >> auth.critical
+grep -E "Resc|Remo" phantom | awk -F"----" '{print $1}' >> auth.critical
+grep queryapi timeout | awk -F"----" '{print $1}' >> auth.critical
+awk -F"----" '{print $1}' wayrm >> auth.critical 
+grep -vE "189901|197001" newaltarch | awk -F"----" '{print $1}' >> auth.critical
+awk -F"----" '{print $1}' newiadate >> auth.critical 
+grep archive.is logbadstatusother | grep -v logbadstatusother1.2 | awk -F"----" '{print $1}' >> auth.critical
+grep -v archive.is logbadstatusother | awk -F"----" '{print $1}' >> auth.critical
+grep "Save this URL on the Wayback Machine" bogusapi | awk -F"----" '{print $1}' >> auth.critical
+
+awk -F"----" '/ A1/{print "grep \"" $1 "\" wayrm"}' bogusapi | tcsh | awk -F"----" '{print $1}' >> auth.critical
+awk 'BEGINFILE{if (ERRNO) nextfile} ! s[$0]++' auth.critical > o; mv o auth.critical
+mv critical critical.orig
+mv timeout timeout.orig
+

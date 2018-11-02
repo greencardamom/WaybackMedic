@@ -1,0 +1,64 @@
+#!/usr/bin/tcsh -f
+
+#
+# Script to automate steps in the cycle
+#
+
+set HOMEDIR="/home/adminuser/wmnim/wm2/"
+
+set cmd=`pwd -L`
+set id=`awk -v cd="$cmd" 'BEGIN{c = split(cd,a,/\//); print a[c]}'`
+
+#
+# To restart at a number > 1
+#
+if ($#argv == 1) then
+  set loop = "$argv[1]"
+else
+  set loop = 1
+endif
+
+while ( $loop < 5 )
+
+  if(-e auth.demon) then
+
+    echo ""
+    echo "------"
+    echo "Starting loop "$loop
+    echo "------"
+    echo ""
+
+    echo "$loop" >> push.log
+
+    wc -l auth.demon
+    ./deletenamewrapper demon
+    if(-e index.temp) mv index.temp index.temp.rerun"$loop"
+    if(-e timeout) mv timeout timeout.rerun"$loop"
+    if(-e critical) mv critical critical.rerun"$loop"
+
+    cd "$HOMEDIR"
+    ./runmedic "$id" auth.demon
+    cd "$cmd"
+
+    if(-e index.temp) mv index.temp index.demon.run"$loop"
+    if(-e redirects) mv redirects redirects.demon.run"$loop"
+    if(-e "$HOMEDIR"redirects) mv "$HOMEDIR"redirects redirects
+
+    if(-e discovered) cp discovered discovered.demon.run"$loop"
+    if(-e discovered.error) cp discovered.error discovered.error.run"$loop"
+    if(-e auth.demon) mv auth.demon auth.demon.run"$loop"
+
+    cd "$HOMEDIR"
+    ./push2wiki -p "$id" -d0 
+    cd "$cmd"
+
+  else
+    echo ""
+    echo "------"
+    echo "No auth.demon ... exiting"
+    exit
+  endif
+
+  @ loop ++
+
+end

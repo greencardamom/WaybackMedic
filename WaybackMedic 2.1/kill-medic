@@ -1,0 +1,2 @@
+ps aux | grep ./medic | grep -v timeout | awk '{print "kill " $2}' | sh
+ps aux | grep wget | grep -v timeout | awk '{print "kill " $2}' | sh

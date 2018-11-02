@@ -1,0 +1,407 @@
+Different methods for manually checking for soft404
+--------------------------------------------------
+
+Method: newaltarch no-cache
+
+  Manual check of newaltarch. No cache. All services.
+
+Method: newaltarch no-cache short
+
+  Manual check of newaltarch. No cache. Filter out archive.is 
+
+Method: newaltarchinx webpage-cache
+  
+  Set Runme.newaltarchinx = true - this will save a local cache copy of each newaltarch webpage with a uniq ID
+  in the file newaltarchinx. The steps below allow for manual checking and removal if soft404
+
+Method: newaltarchinx webpage-cache archive.is
+
+  Same as above but archive.is only
+
+Method: newaltarchinx webpage-cache archive-it
+
+  Same as above but archive-it only
+
+Method: wayback no-cache
+
+  Manual check of waybacklinks for soft404. No cache. Slooow to load. Not practical.
+
+
+NOTE: The best Method should be replicated in ~/scripts/createmosaic (for IMP)
+
+______________________________________________________________________________________________________________
+
+
+------------------------
+Method: newaltarch no-cache short (filter out archive.is and archive-it)
+------------------------
+
+    These are most common trouble-causing:
+      arquivo.pt
+      webarchive.nationalarchives.gov.uk
+      webarchive.loc.gov
+      wayback.vefsafn.is
+      webarchive.org.uk
+      archive-it
+
+      8a.
+
+         mkdir mosaic
+         # Generate newaltarch.mosaic
+         awk -F"----" '{print $2}' newaltarch | awk '{print $3}' | grep -v archive.is | grep -v archive-it | sort | uniq > newaltarchshort.mosaic
+         # Remove links in ~static/oklinks.bm (they were previously OK'd)
+         cp newaltarchshort.mosaic newaltarchshort.mosaic.orig
+         awk 'NR==FNR{a[$0];next} !($0 in a)' /home/adminuser/wmnim/wm2/static/oklinks.bm newaltarchshort.mosaic > o
+         mv o newaltarchshort.mosaic
+         # Split into 50-URL chunks for processing by Firefox
+         split -l 50 newaltarchshort.mosaic mosaic/newaltarchshort.mosaic.
+         # Print how many chunks ie. A -> Z
+         set t=`ls mosaic/newaltarchshort.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZ";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+         cp newaltarchshort.mosaic soft404.bm
+
+       8b.
+
+         Process files sequentially:
+           firefox `awk '$0' mosaic/newaltarchshort.mosaic.aa`
+         etc..
+
+         * KEEP all tabs open
+         * Open a window with 'p soft404.bm'
+         * Manually remove good links. Keep bad links. 
+         * Work to improve filters
+
+       8c.
+
+         # Verify a soft404.bm file exists
+         awk -ireadfile 'BEGIN{f=readfile("soft404.bm");if(length(f)<1){system("bell");printf("No soft404.bm Press c-C");system("sleep 1000")}}'
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm > o; mv o soft404.bm
+         # Update ~static/soft404.bm
+         cp /home/adminuser/wmnim/wm2/static/soft404.bm /home/adminuser/wmnim/wm2/static/soft404.bm.bak
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm >> /home/adminuser/wmnim/wm2/static/soft404.bm
+         
+       # Only if manually checked everything - not for IMP
+         # Update ~static/newaltarch.mosaic and oklinks.bm
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;cp newaltarch.mosaic newaltarch.mosaic.bak;cd "$p"
+         cat /home/adminuser/wmnim/wm2/static/newaltarch.mosaic newaltarchshort.mosaic | sort | uniq > /home/adminuser/wmnim/wm2/static/o
+         mv /home/adminuser/wmnim/wm2/static/o /home/adminuser/wmnim/wm2/static/newaltarch.mosaic
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;awk 'NR==FNR{a[$0];next} !($0 in a)' soft404.bm newaltarch.mosaic > oklinks.bm;cd "$p"
+
+         # Create auth.bm
+         awk '{if($0 ~ /^http/){print "grep \"" $0 "\" newaltarch"}}' soft404.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq > auth.bm
+         # Update logs
+         cp newaltarch newaltarch.origbm ; wc auth.bm
+         cp syslog syslog.origbm
+         ./deletenamewrapimp bm
+         ./deletenamewrapper bm
+
+         runmedic <pid> auth.bm
+
+         # Show stats
+         set aa=`sed -n '$=' soft404.bm`;set a=`sed -n '$=' newaltarch.origbm`;set b=`sed -n '$=' newaltarch`;set c=`c "$b"-"$a"`
+         set d=`grep -c '(1) in soft404.bm' syslog.origbm`;set e=`grep -c '(1) in soft404.bm' syslog`;set f=`c "$e"-"$d"`
+         echo "\nSoft404: ""$aa""\n\nNewaltarch\n----\norig=""$a""\nnew=""$b""\ntot=""$c""\n\nSoft404 hits\n----\norig=""$d""\nnew=""$e""\ntot=""$f""\n"
+         set g=`awk -F"----" '/deadcount/{i2=i2+$2;i3=i3+$3}END{print i3/i2}' syslog`;echo "\n% dead-links saved: ""$g"
+
+
+         NOTE: It is possible to run this in conjunction with other Methods
+
+
+------------------------
+Method: newaltarch no-cache (checks all types)
+------------------------
+
+      8a.
+
+         mkdir mosaic
+         # Generate newaltarch.mosaic
+         awk -F"----" '{print $2}' newaltarch | awk '{print $3}' | sort | uniq > newaltarch.mosaic
+         # Remove links in ~static/oklinks.bm (they were previously OK'd)
+         cp newaltarch.mosaic newaltarch.mosaic.orig
+         awk 'NR==FNR{a[$0];next} !($0 in a)' /home/adminuser/wmnim/wm2/static/oklinks.bm newaltarch.mosaic > o
+         mv o newaltarch.mosaic
+         # Split into 50-URL chunks for processing by Firefox
+         split -l 50 newaltarch.mosaic mosaic/newaltarch.mosaic.
+         # Print how many chunks ie. A -> Z
+         set t=`ls mosaic/newaltarch.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZ";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+
+       8b.
+
+         Process files sequentially:
+           firefox `awk '$0' mosaic/newaltarch.mosaic.aa`
+           firefox `awk '$0' mosaic/newaltarch.mosaic.ab`
+         etc..
+
+         * close tabs thare are OK. Keep tabs that are soft404.
+         * When done, right-click a tab and save tabs as bookmark name "soft404"
+           For subsequent saves, save in the existing folder "soft404" (it will create sub-folders named [No Folder])
+
+         * When done processing all the aa, ab, ac...
+           Click Bookmarks then right-click "soft404" and copy to clipboard
+           Save clipboard to file "soft404.bm" (don't worry about blank lines or ones starting with [No Folder])
+
+       8c.
+
+         # Verify a soft404.bm file exists
+         awk -ireadfile 'BEGIN{f=readfile("soft404.bm");if(length(f)<1){system("bell");printf("No soft404.bm Press c-C");system("sleep 1000")}}'
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm > o; mv o soft404.bm
+         # Update ~static/soft404.bm
+         cp /home/adminuser/wmnim/wm2/static/soft404.bm /home/adminuser/wmnim/wm2/static/soft404.bm.bak
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm >> /home/adminuser/wmnim/wm2/static/soft404.bm
+         # Update ~static/newaltarch.mosaic and oklinks.bm
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;cp newaltarch.mosaic newaltarch.mosaic.bak;cd "$p"
+         cat /home/adminuser/wmnim/wm2/static/newaltarch.mosaic newaltarch.mosaic | sort | uniq > /home/adminuser/wmnim/wm2/static/o
+         mv /home/adminuser/wmnim/wm2/static/o /home/adminuser/wmnim/wm2/static/newaltarch.mosaic
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;awk 'NR==FNR{a[$0];next} !($0 in a)' soft404.bm newaltarch.mosaic > oklinks.bm;cd "$p"
+         # Create auth.bm
+         awk '{if($0 ~ /^http/){print "grep \"" $0 "\" newaltarch"}}' soft404.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq > auth.bm
+         # following line needed due to redirects make it hard to discover original url
+         grep -v archive.is newaltarch | awk -F"----" '{print $1}' | sort | uniq >> auth.bm ; sort auth.bm | uniq > o; mv o auth.bm
+         cp newaltarch newaltarch.origbm ; wc auth.bm
+         cp syslog syslog.origbm
+         ./deletenamewrapimp bm
+         ./deletenamewrapper bm
+
+         runmedic <pid> auth.bm
+
+         # Show stats
+         set aa=`sed -n '$=' soft404.bm`;set a=`sed -n '$=' newaltarch.origbm`;set b=`sed -n '$=' newaltarch`;set c=`c "$b"-"$a"`
+         set d=`grep -c '(1) in soft404.bm' syslog.origbm`;set e=`grep -c '(1) in soft404.bm' syslog`;set f=`c "$e"-"$d"`
+         echo "\nSoft404: ""$aa""\n\nNewaltarch\n----\norig=""$a""\nnew=""$b""\ntot=""$c""\n\nSoft404 hits\n----\norig=""$d""\nnew=""$e""\ntot=""$f""\n"
+         set g=`awk -F"----" '/deadcount/{i2=i2+$2;i3=i3+$3}END{print i3/i2}' syslog`;echo "\n% dead-links saved: ""$g"
+
+
+------------------------
+Method: newaltarchinx webpage-cache archive-it
+------------------------
+
+      8a.
+
+         mkdir mosaic
+        # Generate newaltarch.mosaic
+         awk -F"----" '{print $2}' newaltarch | awk '{print $3}' | grep archive-it.org | sort | uniq > newaltarchait.mosaic
+        # Remove links in ~static/oklinks.bm (they were previously OK'd)
+         awk 'NR==FNR{a[$0];next} !($0 in a)' /home/adminuser/wmnim/wm2/static/oklinks.bm newaltarchait.mosaic > o
+         mv o newaltarchait.mosaic
+        # Remove same links from newaltarchinx
+         awk -i/lib.awk '{r=regesc3($0) " ";for(i=1;i<=splitn("newaltarchinx",a,i);i++){if(a[i] ~ r) {print a[i];break}}}' newaltarchait.mosaic > o
+         mv o newaltarchinx
+        # Generate naaaitinx.mosaic (index to cached webpages)
+         awk -i/lib.awk -F"----" '{print strip($3)" ----"strip($2)}' newaltarchinx|sort|uniq|awk -F"----" '{if($1 ~ /archive[-]it[.]org/) print $2}'>naaaitinx.mosaic
+        # Split into 50-URL chunks for processing by Firefox
+         split -l 50 naaaitinx.mosaic mosaic/naaaitinx.mosaic.
+        # Print how many chunks ie. A -> Z
+         set t=`ls mosaic/naaaitinx.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZ";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+
+       8b.
+
+         Process files sequentially:
+           firefox `awk '$0' mosaic/naaaitinx.mosaic.aa`
+         etc..
+
+         * close tabs thare are OK. Keep tabs that are soft404.
+         * When done, right-click a tab and save tabs as bookmark name "soft404"
+           For subsequent saves, save in the existing folder "soft404" (it will create sub-folders named [No Folder])
+
+         * When done processing all the aa, ab, ac...
+           Click Bookmarks then right-click "soft404" and copy to clipboard
+           Save clipboard to file "soft404.bm" (don't worry about blank lines or ones starting with [No Folder])
+
+       8c.
+
+         # Verify a soft404.bm file exists
+         awk -ireadfile 'BEGIN{f=readfile("soft404.bm");if(length(f)<1){system("bell");printf("No soft404.bm Press c-C");system("sleep 1000")}}'
+         # awk '{if($0 ~ /^http/){print $0}}' soft404.bm > o; mv o soft404.bm
+         # Generate old-style soft404.bm ie. match filename from soft404.bm with that in newaltarchinx and print URL out to soft404.bm
+awk -i/lib.awk '{r=regesc3(sys2var("basename "$0))"----";for(i=1;i<=splitn("newaltarchinx",a,i);i++){if(a[i]~r)print splitx(a[i],"----",3)}}' soft404.bm > o
+         mv soft404.bm soft404.naainx; mv o soft404.bm
+         # Update ~static/soft404.bm
+         cp /home/adminuser/wmnim/wm2/static/soft404.bm /home/adminuser/wmnim/wm2/static/soft404.bm.bak
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm >> /home/adminuser/wmnim/wm2/static/soft404.bm
+         # Update ~static/newaltarch.mosaic and oklinks.bm
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;cp newaltarch.mosaic newaltarch.mosaic.bak;cd "$p"
+         cat /home/adminuser/wmnim/wm2/static/newaltarch.mosaic newaltarchait.mosaic | sort | uniq > /home/adminuser/wmnim/wm2/static/o
+         mv /home/adminuser/wmnim/wm2/static/o /home/adminuser/wmnim/wm2/static/newaltarch.mosaic
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;awk 'NR==FNR{a[$0];next} !($0 in a)' soft404.bm newaltarch.mosaic > oklinks.bm;cd "$p"
+         # Create auth.bm
+         awk '{if($0 ~ /^http/){print "grep \"" $0 "\" newaltarch"}}' soft404.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq > auth.bm
+         # following line needed due to redirects make it hard to discover original url
+         # grep -v archive.is newaltarch | awk -F"----" '{print $1}' | sort | uniq >> auth.bm ; sort auth.bm | uniq > o; mv o auth.bm
+         cp newaltarch newaltarch.origbm ; wc auth.bm
+         cp syslog syslog.origbm
+         ./deletenamewrapimp bm
+         ./deletenamewrapper bm
+
+         runmedic <pid> auth.bm
+
+         # Show stats
+         set aa=`sed -n '$=' soft404.bm`;set a=`sed -n '$=' newaltarch.origbm`;set b=`sed -n '$=' newaltarch`;set c=`c "$b"-"$a"`
+         set d=`grep -c '(1) in soft404.bm' syslog.origbm`;set e=`grep -c '(1) in soft404.bm' syslog`;set f=`c "$e"-"$d"`
+         echo "\nSoft404: ""$aa""\n\nNewaltarch\n----\norig=""$a""\nnew=""$b""\ntot=""$c""\n\nSoft404 hits\n----\norig=""$d""\nnew=""$e""\ntot=""$f""\n"
+         set g=`awk -F"----" '/deadcount/{i2=i2+$2;i3=i3+$3}END{print i3/i2}' syslog`;echo "\n% dead-links saved: ""$g"
+
+------------------------
+Method: newaltarchinx webpage-cache archive.is
+------------------------
+
+      8a.
+
+         mkdir mosaic
+        # Generate newaltarch.mosaic
+         awk -F"----" '{print $2}' newaltarch | awk '{print $3}' | grep archive.is | sort | uniq > newaltarchais.mosaic
+        # Remove links in ~static/oklinks.bm (they were previously OK'd)
+         awk 'NR==FNR{a[$0];next} !($0 in a)' /home/adminuser/wmnim/wm2/static/oklinks.bm newaltarchais.mosaic > o
+         mv o newaltarchais.mosaic
+        # Remove same links from newaltarchinx
+         awk -i/lib.awk '{r=regesc3($0) " ";for(i=1;i<=splitn("newaltarchinx",a,i);i++){if(a[i] ~ r) {print a[i];break}}}' newaltarchais.mosaic > o
+         mv o newaltarchinx
+        # Generate naaaisinx.mosaic (index to cached webpages)
+         awk -i/lib.awk -F"----" '{print strip($3)" ----"strip($2)}' newaltarchinx|sort|uniq|awk -F"----" '{if($1 ~ /archive[.]is/) print $2}'>naaaisinx.mosaic
+        # Split into 50-URL chunks for processing by Firefox
+         split -l 50 naaaisinx.mosaic mosaic/naaaisinx.mosaic.
+        # Print how many chunks ie. A -> Z
+         set t=`ls mosaic/naaaisinx.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZ";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+
+       8b.
+
+         Process files sequentially:
+           firefox `awk '$0' mosaic/naaaitsnx.mosaic.aa`
+         etc..
+
+         * close tabs thare are OK. Keep tabs that are soft404.
+         * When done, right-click a tab and save tabs as bookmark name "soft404"
+           For subsequent saves, save in the existing folder "soft404" (it will create sub-folders named [No Folder])
+
+         * When done processing all the aa, ab, ac...
+           Click Bookmarks then right-click "soft404" and copy to clipboard
+           Save clipboard to file "soft404.bm" (don't worry about blank lines or ones starting with [No Folder])
+
+       8c.
+
+         # Verify a soft404.bm file exists
+         awk -ireadfile 'BEGIN{f=readfile("soft404.bm");if(length(f)<1){system("bell");printf("No soft404.bm Press c-C");system("sleep 1000")}}'
+         # awk '{if($0 ~ /^http/){print $0}}' soft404.bm > o; mv o soft404.bm
+         # Generate old-style soft404.bm ie. match filename from soft404.bm with that in newaltarchinx and print URL out to soft404.bm
+awk -i/lib.awk '{r=regesc3(sys2var("basename "$0))"----";for(i=1;i<=splitn("newaltarchinx",a,i);i++){if(a[i]~r)print splitx(a[i],"----",3)}}' soft404.bm > o
+         mv soft404.bm soft404.naainx; mv o soft404.bm
+         # Update ~static/soft404.bm
+         cp /home/adminuser/wmnim/wm2/static/soft404.bm /home/adminuser/wmnim/wm2/static/soft404.bm.bak
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm >> /home/adminuser/wmnim/wm2/static/soft404.bm
+         # Update ~static/newaltarch.mosaic and oklinks.bm
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;cp newaltarch.mosaic newaltarch.mosaic.bak;cd "$p"
+         cat /home/adminuser/wmnim/wm2/static/newaltarch.mosaic newaltarchais.mosaic | sort | uniq > /home/adminuser/wmnim/wm2/static/o
+         mv /home/adminuser/wmnim/wm2/static/o /home/adminuser/wmnim/wm2/static/newaltarch.mosaic
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;awk 'NR==FNR{a[$0];next} !($0 in a)' soft404.bm newaltarch.mosaic > oklinks.bm;cd "$p"
+         # Create auth.bm
+         awk '{if($0 ~ /^http/){print "grep \"" $0 "\" newaltarch"}}' soft404.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq > auth.bm
+         # following line needed due to redirects make it hard to discover original url
+         # grep -v archive.is newaltarch | awk -F"----" '{print $1}' | sort | uniq >> auth.bm ; sort auth.bm | uniq > o; mv o auth.bm
+         cp newaltarch newaltarch.origbm ; wc auth.bm
+         cp syslog syslog.origbm
+         ./deletenamewrapimp bm
+         ./deletenamewrapper bm
+
+         runmedic <pid> auth.bm
+
+         # Show stats
+         set aa=`sed -n '$=' soft404.bm`;set a=`sed -n '$=' newaltarch.origbm`;set b=`sed -n '$=' newaltarch`;set c=`c "$b"-"$a"`
+         set d=`grep -c '(1) in soft404.bm' syslog.origbm`;set e=`grep -c '(1) in soft404.bm' syslog`;set f=`c "$e"-"$d"`
+         echo "\nSoft404: ""$aa""\n\nNewaltarch\n----\norig=""$a""\nnew=""$b""\ntot=""$c""\n\nSoft404 hits\n----\norig=""$d""\nnew=""$e""\ntot=""$f""\n"
+         set g=`awk -F"----" '/deadcount/{i2=i2+$2;i3=i3+$3}END{print i3/i2}' syslog`;echo "\n% dead-links saved: ""$g"
+
+------------------------
+Method: newaltarchinx webpage-cache
+------------------------
+
+      8a.
+
+         mkdir mosaic
+        # Generate newaltarch.mosaic
+         awk -F"----" '{print $2}' newaltarch | awk '{print $3}' | sort | uniq > newaltarch.mosaic
+        # Remove links in ~static/oklinks.bm (they were previously OK'd)
+         cp newaltarch.mosaic newaltarch.mosaic.orig
+         awk 'NR==FNR{a[$0];next} !($0 in a)' /home/adminuser/wmnim/wm2/static/oklinks.bm newaltarch.mosaic > o
+         mv o newaltarch.mosaic
+        # Remove same links from newaltarchinx
+         cp newaltarchinx newaltarchinx.orig
+         awk -i/lib.awk '{r=regesc3($0) " ";for(i=1;i<=splitn("newaltarchinx",a,i);i++){if(a[i] ~ r) {print a[i];break}}}' newaltarch.mosaic > o
+         mv o newaltarchinx
+        # Generate naainx.mosaic (index to cached webpages)
+         awk -i/lib.awk -F"----" '{print strip($3)" ----"strip($2)}' newaltarchinx|sort|uniq|awk -F"----" '{print $2}'>naainx.mosaic
+        # Split into 50-URL chunks for processing by Firefox
+         split -l 50 naainx.mosaic mosaic/naainx.mosaic.
+        # Print how many chunks ie. A -> Z
+         set t=`ls mosaic/naainx.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZ";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+
+       8b.
+
+         Process files sequentially:
+           firefox `awk '$0' mosaic/naainx.mosaic.aa`
+           firefox `awk '$0' mosaic/naainx.mosaic.ab`
+         etc..
+
+         * close tabs thare are OK. Keep tabs that are soft404.
+         * When done, right-click a tab and save tabs as bookmark name "soft404"
+           For subsequent saves, save in the existing folder "soft404" (it will create sub-folders named [No Folder])
+
+         * When done processing all the aa, ab, ac...
+           Click Bookmarks then right-click "soft404" and copy to clipboard
+           Save clipboard to file "soft404.bm" (don't worry about blank lines or ones starting with [No Folder])
+
+       8c.
+
+         # Verify a soft404.bm file exists
+         awk -ireadfile 'BEGIN{f=readfile("soft404.bm");if(length(f)<1){system("bell");printf("No soft404.bm Press c-C");system("sleep 1000")}}'
+         # awk '{if($0 ~ /^http/){print $0}}' soft404.bm > o; mv o soft404.bm
+         # Generate old-style soft404.bm ie. match filename from soft404.bm with that in newaltarchinx and print URL out to soft404.bm
+awk -i/lib.awk '{r=regesc3(sys2var("basename "$0))"----";for(i=1;i<=splitn("newaltarchinx",a,i);i++){if(a[i]~r)print splitx(a[i],"----",3)}}' soft404.bm > o
+         mv soft404.bm soft404.naainx; mv o soft404.bm
+         # Update ~static/soft404.bm
+         cp /home/adminuser/wmnim/wm2/static/soft404.bm /home/adminuser/wmnim/wm2/static/soft404.bm.bak
+         awk '{if($0 ~ /^http/){print $0}}' soft404.bm >> /home/adminuser/wmnim/wm2/static/soft404.bm
+         # Update ~static/newaltarch.mosaic and oklinks.bm
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;cp newaltarch.mosaic newaltarch.mosaic.bak;cd "$p"
+         cat /home/adminuser/wmnim/wm2/static/newaltarch.mosaic newaltarch.mosaic | sort | uniq > /home/adminuser/wmnim/wm2/static/o
+         mv /home/adminuser/wmnim/wm2/static/o /home/adminuser/wmnim/wm2/static/newaltarch.mosaic
+         set p=`pwd -L`;cd /home/adminuser/wmnim/wm2/static;awk 'NR==FNR{a[$0];next} !($0 in a)' soft404.bm newaltarch.mosaic > oklinks.bm;cd "$p"
+         # Create auth.bm
+         awk '{if($0 ~ /^http/){print "grep \"" $0 "\" newaltarch"}}' soft404.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq > auth.bm
+         # following line needed due to redirects make it hard to discover original url
+         grep -v archive.is newaltarch | awk -F"----" '{print $1}' | sort | uniq >> auth.bm ; sort auth.bm | uniq > o; mv o auth.bm
+         cp newaltarch newaltarch.origbm ; wc auth.bm
+         cp syslog syslog.origbm
+         ./deletenamewrapimp bm
+         ./deletenamewrapper bm
+
+         runmedic <pid> auth.bm
+
+         # Show stats
+         set aa=`sed -n '$=' soft404.bm`;set a=`sed -n '$=' newaltarch.origbm`;set b=`sed -n '$=' newaltarch`;set c=`c "$b"-"$a"`
+         set d=`grep -c '(1) in soft404.bm' syslog.origbm`;set e=`grep -c '(1) in soft404.bm' syslog`;set f=`c "$e"-"$d"`
+         echo "\nSoft404: ""$aa""\n\nNewaltarch\n----\norig=""$a""\nnew=""$b""\ntot=""$c""\n\nSoft404 hits\n----\norig=""$d""\nnew=""$e""\ntot=""$f""\n"
+         set g=`awk -F"----" '/deadcount/{i2=i2+$2;i3=i3+$3}END{print i3/i2}' syslog`;echo "\n% dead-links saved: ""$g"
+
+------------------------
+Method: wayback no-cache
+------------------------
+
+         awk -F"----" '{print $2}' newialink | sort | uniq > newialink.mosaic
+         split -l 50 newialink.mosaic mosaic/newialink.mosaic.
+         set t=`ls mosaic/newialink.mosaic.*|wc -l`;awk -v n=$t 'BEGIN{a="ABCDEFGHIJKLMNOPQRSTUVWXYZ";print "Runs: "n" (A.."substr(a, n, 1)")"}'
+
+         Process files sequentially:
+           firefox `awk '$0' mosaic/newialink.mosaic.aa`
+           firefox `awk '$0' mosaic/newialink.mosaic.ab`
+         etc..
+
+         Save file as "soft404i.bm"
+
+         awk '{if($0 ~ /^http/){print $0}}' soft404i.bm > o; mv o soft404i.bm
+         awk '{if($0 ~ /^http/){print $0}}' soft404i.bm >> /home/adminuser/wmnim/wm2/static/soft404i.bm
+         awk '{if($0 ~ /^http/){print "grep \"" $0 "\" newialink"}}' soft404i.bm | tcsh | awk -F"----" '{print $1}' | sort | uniq >> auth.bmi
+         cp newialink newialink.origbm ; wc auth.bmi
+         ./deletenamewrapper bmi
+
+         runmedic <pid> auth.bmi
+
+         wc newialink.origbm; echo "----"; wc newialink
+

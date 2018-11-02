@@ -1,0 +1,15 @@
+Bot Modules  
+
+==Install==
+
+Requires a BotWikiAwk install
+
+==Running==
+
+Can be run as a stand-alone bot, or as part of WaybackMedic via modules.nim
+
+To run as standalone, use BotWikiAwk commands: project, runbot, bug
+
+Either way it's the same code with no changes ie. wam.awk works without modification either 
+running from the command-line or called from WaybackMedic as a script.
+
