@@ -20,13 +20,13 @@
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.  
+# THE SOFTWARE.
 
 @include "library.awk"
-@include "getopt.awk"
 
 BEGIN {
 
+  Optind = Opterr = 1
   while ((C = getopt(ARGC, ARGV, "pu:t:c:")) != -1) {
       opts++
       if(C == "u")                 #  -u <url>         URL to check.
@@ -65,6 +65,16 @@ BEGIN {
 
 }
 
+# 
+# verifyval - verify any command-line argument has valid value. Usage in getopt()
+# 
+function verifyval(val) {
+  if(val == "" || substr(val,1,1) ~/^[-]/) {
+    stdErr("Command line argument has an empty value when it should have something.")
+    exit         
+  }
+  return val
+}
 
 function usage() {
 
@@ -80,4 +90,5 @@ function usage() {
   print ""
 
 }
+
 
